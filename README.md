@@ -1,6 +1,6 @@
 # TraceForge
 
-Lightweight, zero-allocation logging for Unity 6.3 LTS.
+A lightweight, zero-allocation logging system for Unity 6 with no third-party dependencies.
 
 ## Features
 
