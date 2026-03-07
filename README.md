@@ -14,7 +14,7 @@ Lightweight, zero-allocation logging for Unity 6.3 LTS.
 
 Add via Unity Package Manager using Git URL:
 ```
-https://github.com/makeitliveforever/trace-forge.git
+https://github.com/shinjh0380/trace-forge.git
 ```
 
 ## Quick Start
