@@ -60,6 +60,14 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
         └── README.md
 ```
 
+## 브랜칭 전략
+
+- **main**: UPM 패키지 전용 (Git URL 설치 대상). Claude 파일 없음. .meta 포함.
+- **dev**: 작업 브랜치. Claude 파일(`.claude/`, `CLAUDE.md`) + .meta 포함.
+- 모든 개발은 `dev`에서 진행. `main`에서 직접 커밋 금지.
+- 머지: `dev → main` 단방향. `traceforge-release-merge` 스킬 사용.
+- .gitignore: 브랜치마다 다름 (main은 `.claude/`와 `CLAUDE.md`를 ignore).
+
 ## 코딩 컨벤션
 
 - Namespace: `TraceForge` (Runtime), `TraceForge.Editor` (Editor)
@@ -87,4 +95,6 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
 | `traceforge-performance-review` | 코어 로직 변경 후 hot-path 할당 검사 |
 | `traceforge-api-consistency` | 퍼블릭 API 추가/변경 후 일관성 검증 |
 | `traceforge-release-check` | 버전 태그 전 최종 관문 |
+| `traceforge-release-merge` | dev→main 머지 시 |
+| `traceforge-version-bump` | 버전 업그레이드 시 |
 | `traceforge-research` | 아키텍처 의사결정 전 격리된 조사 |
