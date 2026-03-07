@@ -15,7 +15,7 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
 
 ```
 (repo root)
-├── package.json                   (com.makeitliveforever.traceforge, v0.1.0)
+├── package.json                   (com.skrawberries.traceforge, v0.1.0)
 ├── CHANGELOG.md
 ├── LICENSE.md
 ├── README.md
@@ -50,7 +50,8 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
 │   │   └── LogEntryTests.cs
 │   └── Editor/
 │       ├── TraceForge.Tests.Editor.asmdef
-│       └── SettingsProviderTests.cs
+│       ├── SettingsProviderTests.cs
+│       └── PackageMetaValidationTests.cs
 ├── Documentation~/
 │   └── TraceForge.md
 └── Samples~/

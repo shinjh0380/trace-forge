@@ -1,5 +1,5 @@
 {
-  "name": "com.makeitliveforever.traceforge",
+  "name": "com.skrawberries.traceforge",
   "version": "0.1.0",
   "displayName": "TraceForge",
   "description": "Lightweight, zero-allocation logging for Unity 6.3 LTS. Sink-based architecture with category and verbosity filtering.",
