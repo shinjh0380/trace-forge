@@ -2,6 +2,11 @@
 
 Lightweight, zero-allocation logging for Unity 6.3 LTS.
 
+## Requirements
+
+- Unity 6.x (6000.0 or later)
+- API Compatibility Level: **.NET Standard 2.1**
+
 ## Features
 
 - **Sink-based** — route logs to Unity Console, ring buffer, file, or your own sink
