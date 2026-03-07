@@ -149,4 +149,4 @@ For bug reports or feature requests, please open an issue in the [Issues](https:
 
 ## License
 
-MIT — see [LICENSE.md](LICENSE.md)
+[MIT License]([LICENSE.md](LICENSE.md)) © 2026 shinjh0380
