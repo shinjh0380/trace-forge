@@ -11,25 +11,52 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
 
 ## UPM 패키지 구조
 
+레포 루트 = 패키지 루트 (Git URL 직접 설치 구조)
+
 ```
-Packages/com.traceforge.core/
-├── package.json
+(repo root)
+├── package.json                   (com.makeitliveforever.traceforge, v0.1.0)
 ├── CHANGELOG.md
 ├── LICENSE.md
 ├── README.md
 ├── Runtime/
 │   ├── TraceForge.Runtime.asmdef
-│   ├── Core/         (Logger, LogEntry, LogCategory, LogVerbosity)
-│   ├── Sinks/        (ILogSink, ConsoleSink, UnityConsoleSink)
-│   └── Filtering/    (CategoryFilter, VerbosityFilter)
+│   ├── AssemblyInfo.cs            (InternalsVisibleTo tests)
+│   ├── TF.cs                      (정적 파사드)
+│   ├── Verbosity.cs               (enum: Trace~Fatal, Off)
+│   ├── LogCategory.cs             (readonly struct)
+│   ├── LogEntry.cs                (readonly struct)
+│   ├── ILogSink.cs                (Write(in LogEntry), Flush())
+│   ├── Logger.cs                  (internal 코어 엔진)
+│   ├── LoggerConfig.cs            (런타임 설정)
+│   ├── Categories.cs              (Default, Gameplay, Network, UI, Audio, Physics, AI, Performance)
+│   └── Sinks/
+│       ├── UnityConsoleSink.cs    (Main Thread 전용, ThreadStatic re-entry guard)
+│       ├── RingBufferSink.cs      (circular buffer, lock 기반)
+│       └── FileSink.cs            (IDisposable, UTF-8, lock 기반)
 ├── Editor/
 │   ├── TraceForge.Editor.asmdef
-│   └── Settings/     (TraceForge Settings window)
+│   ├── TraceForgeSettingsProvider.cs  (Project Settings > TraceForge)
+│   ├── TraceForgeLogViewerWindow.cs   (Window > TraceForge > Log Viewer)
+│   └── TraceForgeMenuItems.cs
 ├── Tests/
-│   ├── Runtime/      (TraceForge.Tests.Runtime.asmdef)
-│   └── Editor/       (TraceForge.Tests.Editor.asmdef)
+│   ├── Runtime/
+│   │   ├── TraceForge.Tests.Runtime.asmdef
+│   │   ├── VerbosityFilteringTests.cs
+│   │   ├── CategoryFilteringTests.cs
+│   │   ├── SinkDispatchTests.cs
+│   │   ├── RingBufferSinkTests.cs
+│   │   ├── FileSinkTests.cs
+│   │   └── LogEntryTests.cs
+│   └── Editor/
+│       ├── TraceForge.Tests.Editor.asmdef
+│       └── SettingsProviderTests.cs
+├── Documentation~/
+│   └── TraceForge.md
 └── Samples~/
     └── BasicUsage/
+        ├── TraceForgeBasicUsage.cs
+        └── README.md
 ```
 
 ## 코딩 컨벤션

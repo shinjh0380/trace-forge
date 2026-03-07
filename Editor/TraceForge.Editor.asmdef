@@ -1,0 +1,16 @@
+{
+  "name": "TraceForge.Editor",
+  "rootNamespace": "TraceForge.Editor",
+  "references": [
+    "TraceForge.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
