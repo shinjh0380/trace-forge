@@ -1,3 +1,7 @@
+# Claude Code tooling (dev-only)
+.claude/
+CLAUDE.md
+
 # Git worktrees
 .worktrees/
 
