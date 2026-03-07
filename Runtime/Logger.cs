@@ -61,6 +61,7 @@ namespace TraceForge
             return true;
         }
 
+        [HideInCallstack]
         internal static void Write(Verbosity verbosity, in LogCategory category, string message, Exception exception)
         {
             if (!IsEnabled(verbosity, category))
