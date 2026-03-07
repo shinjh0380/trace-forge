@@ -137,6 +137,16 @@ Add to your `asmdef` or scripting define symbols:
 - **Window > TraceForge > Log Viewer** — view recent logs from RingBufferSink
 - **Window > TraceForge > Reset Logger** — reset to defaults
 
+## Contributing
+
+1. Fork this repository.
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Commit your changes (`git commit -m 'feat: add new feature'`)
+4. Push the branch to your fork (`git push origin feat/my-feature`)
+5. Open a Pull Request.
+
+For bug reports or feature requests, please open an issue in the [Issues](https://github.com/shinjh0380/trace-forge/issues) section.
+
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md)
