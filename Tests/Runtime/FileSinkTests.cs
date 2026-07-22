@@ -216,7 +216,7 @@ namespace TraceForge.Tests
         }
 
         [Test]
-        public void Write_UncontendedProducerPath_ProducesZeroGcAllocEvents()
+        public void Write_NonSaturatedProducerPath_ProducesZeroGcAllocEvents()
         {
             const int warmupCount = 1000;
             const int entryCount = 100000;
@@ -228,6 +228,30 @@ namespace TraceForge.Tests
                     sink.Write(in entry);
 
                 sink.Flush();
+
+                long controlCountBefore;
+                long controlCountAfter;
+
+                using (var controlRecorder = ProfilerRecorder.StartNew(
+                    ProfilerCategory.Internal,
+                    "GC.Alloc",
+                    1024,
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread))
+                {
+                    Assert.IsTrue(controlRecorder.Valid);
+                    Assert.IsTrue(controlRecorder.IsRunning);
+                    Assert.Less(controlRecorder.Count, controlRecorder.Capacity);
+
+                    controlCountBefore = controlRecorder.Count;
+                    object controlAllocation = new object();
+                    GC.KeepAlive(controlAllocation);
+                    controlCountAfter = controlRecorder.Count;
+
+                    Assert.Greater(
+                        controlCountAfter,
+                        controlCountBefore,
+                        $"GC.Alloc recorder did not observe the control allocation. Before: {controlCountBefore}, after: {controlCountAfter}.");
+                }
 
                 using (var recorder = ProfilerRecorder.StartNew(
                     ProfilerCategory.Internal,
@@ -248,7 +272,9 @@ namespace TraceForge.Tests
 
                     sink.Flush();
                     TestContext.Out.WriteLine(
-                        $"GC_ALLOC_RESULT countBefore={countBefore} capacity={recorder.Capacity} allocationSamples={allocationSamples}");
+                        $"GC_ALLOC_RESULT controlCountBefore={controlCountBefore} controlCountAfter={controlCountAfter} " +
+                        $"controlAllocationSamples={controlCountAfter - controlCountBefore} countBefore={countBefore} " +
+                        $"capacity={recorder.Capacity} allocationSamples={allocationSamples}");
                     Assert.AreEqual(0, allocationSamples);
                 }
             }
