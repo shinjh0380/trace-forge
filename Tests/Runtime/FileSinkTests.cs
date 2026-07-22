@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Unity.Profiling;
 
 namespace TraceForge.Tests
 {
@@ -212,6 +213,39 @@ namespace TraceForge.Tests
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => new FileSink(_tempFile, false, 0));
             Assert.Throws<ArgumentOutOfRangeException>(() => new FileSink(_tempFile, false, -1));
+        }
+
+        [Test]
+        public void Write_UncontendedProducerPath_ProducesZeroGcAllocEvents()
+        {
+            const int warmupCount = 1000;
+            const int entryCount = 100000;
+            var entry = CreateEntry("allocation regression");
+
+            using (var sink = new FileSink(TextWriter.Null, entryCount + 1024))
+            {
+                for (int i = 0; i < warmupCount; i++)
+                    sink.Write(in entry);
+
+                sink.Flush();
+
+                using (var recorder = ProfilerRecorder.StartNew(
+                    ProfilerCategory.Internal,
+                    "GC.Alloc",
+                    16,
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread))
+                {
+                    long countBefore = recorder.Count;
+
+                    for (int i = 0; i < entryCount; i++)
+                        sink.Write(in entry);
+
+                    long allocationSamples = recorder.Count - countBefore;
+
+                    sink.Flush();
+                    Assert.AreEqual(0, allocationSamples);
+                }
+            }
         }
 
         [Test]
