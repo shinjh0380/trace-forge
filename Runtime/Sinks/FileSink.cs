@@ -1,24 +1,306 @@
 using System;
+using System.Globalization;
 using System.IO;
+using System.Threading;
 
 namespace TraceForge
 {
     /// <summary>
-    /// Writes log entries to a file. Thread-safe. Implements <see cref="IDisposable"/>.
+    /// Queues log entries and writes them to a file on a dedicated background thread.
+    /// Thread-safe. Implements <see cref="IDisposable"/>.
     /// </summary>
     public sealed class FileSink : ILogSink, IDisposable
     {
-        private readonly StreamWriter _writer;
-        private readonly object _lock = new object();
+        private const int DefaultQueueCapacity = 4096;
+        private const string TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+
+        private readonly TextWriter _writer;
+        private readonly LogEntry[] _queue;
+        private readonly object _syncRoot = new object();
+        private readonly object _writerLock = new object();
+        private readonly object _lifecycleLock = new object();
+        private readonly Thread _worker;
+
+        private int _head;
+        private int _tail;
+        private int _count;
+        private long _acceptedCount;
+        private long _writtenCount;
+        private bool _accepting = true;
         private bool _disposed;
+        private Exception _workerException;
 
         /// <summary>
-        /// Opens or creates a log file at <paramref name="filePath"/>.
+        /// Opens or creates a log file with the default queue capacity of 4,096 entries.
         /// </summary>
         /// <param name="filePath">Absolute or relative path to the log file.</param>
-        /// <param name="append">If true, appends to existing file; otherwise overwrites.</param>
+        /// <param name="append">If true, appends to an existing file; otherwise overwrites it.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="filePath"/> is null or empty.</exception>
         public FileSink(string filePath, bool append = false)
+            : this(filePath, append, DefaultQueueCapacity)
         {
+        }
+
+        /// <summary>
+        /// Opens or creates a log file with the specified bounded queue capacity.
+        /// </summary>
+        /// <param name="filePath">Absolute or relative path to the log file.</param>
+        /// <param name="append">If true, appends to an existing file; otherwise overwrites it.</param>
+        /// <param name="queueCapacity">Maximum number of entries waiting in the queue.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="filePath"/> is null or empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="queueCapacity"/> is not positive.</exception>
+        public FileSink(string filePath, bool append, int queueCapacity)
+            : this(CreateWriter(filePath, append, queueCapacity), queueCapacity)
+        {
+        }
+
+        internal FileSink(TextWriter writer, int queueCapacity)
+        {
+            if (writer == null)
+                throw new ArgumentNullException(nameof(writer));
+
+            ValidateQueueCapacity(queueCapacity);
+
+            _writer = writer;
+            _queue = new LogEntry[queueCapacity];
+            _worker = new Thread(WriterLoop)
+            {
+                IsBackground = true,
+                Name = "TraceForge.FileSink"
+            };
+
+            try
+            {
+                _worker.Start();
+            }
+            catch
+            {
+                try { _writer.Dispose(); }
+                catch { }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Enqueues a log entry. Blocks only while the bounded queue is full.
+        /// </summary>
+        /// <param name="entry">The immutable log entry to enqueue.</param>
+        /// <exception cref="IOException">Thrown when the writer thread has failed.</exception>
+        public void Write(in LogEntry entry)
+        {
+            lock (_syncRoot)
+            {
+                while (_count == _queue.Length && _accepting && _workerException == null)
+                    Monitor.Wait(_syncRoot);
+
+                ThrowIfFaultedLocked();
+
+                if (!_accepting)
+                    return;
+
+                _queue[_tail] = entry;
+                _tail = (_tail + 1) % _queue.Length;
+                _count++;
+                _acceptedCount++;
+                Monitor.PulseAll(_syncRoot);
+            }
+        }
+
+        /// <summary>
+        /// Waits for all entries accepted before this call and flushes the underlying writer.
+        /// </summary>
+        /// <exception cref="IOException">Thrown when the writer thread or underlying writer has failed.</exception>
+        public void Flush()
+        {
+            lock (_lifecycleLock)
+            {
+                long targetSequence;
+
+                lock (_syncRoot)
+                {
+                    if (_disposed)
+                        return;
+
+                    ThrowIfFaultedLocked();
+                    targetSequence = _acceptedCount;
+
+                    while (_writtenCount < targetSequence && _workerException == null)
+                        Monitor.Wait(_syncRoot);
+
+                    ThrowIfFaultedLocked();
+                }
+
+                try
+                {
+                    lock (_writerLock)
+                        _writer.Flush();
+                }
+                catch (Exception ex)
+                {
+                    RecordWorkerFailure(ex);
+                    throw CreateWriterException(ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stops accepting entries, drains the queue, joins the writer thread, and closes the file.
+        /// </summary>
+        /// <exception cref="IOException">Thrown after cleanup when the underlying writer has failed.</exception>
+        public void Dispose()
+        {
+            Exception failure;
+
+            lock (_lifecycleLock)
+            {
+                lock (_syncRoot)
+                {
+                    if (_disposed)
+                        return;
+
+                    _accepting = false;
+                    Monitor.PulseAll(_syncRoot);
+                }
+
+                _worker.Join();
+
+                lock (_syncRoot)
+                    failure = _workerException;
+
+                lock (_writerLock)
+                {
+                    if (failure == null)
+                    {
+                        try { _writer.Flush(); }
+                        catch (Exception ex) { failure = ex; }
+                    }
+
+                    try { _writer.Dispose(); }
+                    catch (Exception ex)
+                    {
+                        if (failure == null)
+                            failure = ex;
+                    }
+                }
+
+                lock (_syncRoot)
+                {
+                    if (_workerException == null && failure != null)
+                        _workerException = failure;
+
+                    failure = _workerException;
+                    _disposed = true;
+                    Monitor.PulseAll(_syncRoot);
+                }
+            }
+
+            if (failure != null)
+                throw CreateWriterException(failure);
+        }
+
+        private void WriterLoop()
+        {
+            try
+            {
+                while (TryDequeue(out LogEntry entry))
+                {
+                    WriteEntry(in entry);
+
+                    lock (_syncRoot)
+                    {
+                        _writtenCount++;
+                        Monitor.PulseAll(_syncRoot);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                RecordWorkerFailure(ex);
+            }
+        }
+
+        private bool TryDequeue(out LogEntry entry)
+        {
+            lock (_syncRoot)
+            {
+                while (_count == 0 && _accepting)
+                    Monitor.Wait(_syncRoot);
+
+                if (_count == 0)
+                {
+                    entry = default(LogEntry);
+                    return false;
+                }
+
+                entry = _queue[_head];
+                _queue[_head] = default(LogEntry);
+                _head = (_head + 1) % _queue.Length;
+                _count--;
+                Monitor.PulseAll(_syncRoot);
+                return true;
+            }
+        }
+
+        private void WriteEntry(in LogEntry entry)
+        {
+            lock (_writerLock)
+            {
+                Span<char> timestampBuffer = stackalloc char[24];
+                var timestamp = new DateTime(entry.TimestampTicks, DateTimeKind.Utc);
+
+                if (!timestamp.TryFormat(
+                    timestampBuffer,
+                    out int timestampLength,
+                    TimestampFormat,
+                    CultureInfo.InvariantCulture))
+                {
+                    throw new FormatException("TraceForge could not format the log timestamp.");
+                }
+
+                _writer.Write('[');
+                _writer.Write(timestampBuffer.Slice(0, timestampLength));
+                _writer.Write("] [");
+                _writer.Write(GetVerbosityName(entry.Verbosity));
+                _writer.Write("] [");
+                _writer.Write(entry.Category.Name ?? "Default");
+                _writer.Write("] ");
+                _writer.WriteLine(entry.Message ?? string.Empty);
+
+                if (entry.Exception != null)
+                {
+                    _writer.Write("Exception: ");
+                    _writer.WriteLine(entry.Exception);
+                }
+            }
+        }
+
+        private void RecordWorkerFailure(Exception exception)
+        {
+            lock (_syncRoot)
+            {
+                if (_workerException == null)
+                    _workerException = exception;
+
+                _accepting = false;
+                Monitor.PulseAll(_syncRoot);
+            }
+        }
+
+        private void ThrowIfFaultedLocked()
+        {
+            if (_workerException != null)
+                throw CreateWriterException(_workerException);
+        }
+
+        private static IOException CreateWriterException(Exception innerException)
+        {
+            return new IOException("TraceForge FileSink writer failed.", innerException);
+        }
+
+        private static TextWriter CreateWriter(string filePath, bool append, int queueCapacity)
+        {
+            ValidateQueueCapacity(queueCapacity);
+
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentNullException(nameof(filePath));
 
@@ -26,56 +308,35 @@ namespace TraceForge
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            _writer = new StreamWriter(filePath, append, System.Text.Encoding.UTF8) { AutoFlush = false };
+            return new StreamWriter(filePath, append, System.Text.Encoding.UTF8)
+            {
+                AutoFlush = false
+            };
         }
 
-        /// <summary>Writes a formatted log entry line to the file. Thread-safe.</summary>
-        public void Write(in LogEntry entry)
+        private static void ValidateQueueCapacity(int queueCapacity)
         {
-            if (_disposed) return;
-
-            var line = FormatLine(in entry);
-            lock (_lock)
+            if (queueCapacity <= 0)
             {
-                if (_disposed) return;
-                _writer.WriteLine(line);
+                throw new ArgumentOutOfRangeException(
+                    nameof(queueCapacity),
+                    "Queue capacity must be greater than zero.");
             }
         }
 
-        /// <summary>Flushes all buffered entries to the underlying file stream. Thread-safe.</summary>
-        public void Flush()
+        private static string GetVerbosityName(Verbosity verbosity)
         {
-            if (_disposed) return;
-            lock (_lock)
+            switch (verbosity)
             {
-                if (_disposed) return;
-                _writer.Flush();
+                case Verbosity.Trace: return "TRACE";
+                case Verbosity.Debug: return "DEBUG";
+                case Verbosity.Info: return "INFO";
+                case Verbosity.Warning: return "WARNING";
+                case Verbosity.Error: return "ERROR";
+                case Verbosity.Fatal: return "FATAL";
+                case Verbosity.Off: return "OFF";
+                default: return "UNKNOWN";
             }
-        }
-
-        /// <summary>Flushes and closes the underlying file stream.</summary>
-        public void Dispose()
-        {
-            lock (_lock)
-            {
-                if (_disposed) return;
-                _disposed = true;
-                try { _writer.Flush(); } catch { /* ignore */ }
-                _writer.Dispose();
-            }
-        }
-
-        private static string FormatLine(in LogEntry entry)
-        {
-            var timestamp = new DateTime(entry.TimestampTicks, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-            var verbosity = entry.Verbosity.ToString().ToUpperInvariant();
-            var category = entry.Category.Name ?? "Default";
-            var message = entry.Message ?? string.Empty;
-
-            if (entry.Exception != null)
-                return $"[{timestamp}] [{verbosity}] [{category}] {message}{Environment.NewLine}Exception: {entry.Exception}";
-
-            return $"[{timestamp}] [{verbosity}] [{category}] {message}";
         }
     }
 }
