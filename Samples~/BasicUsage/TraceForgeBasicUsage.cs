@@ -66,7 +66,11 @@ public class TraceForgeBasicUsage : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Flush and close file sink when done
-        _fileSink?.Dispose();
+        // Remove, flush, and close file sink when done
+        if (_fileSink != null)
+        {
+            TF.RemoveSink(_fileSink);
+            _fileSink.Dispose();
+        }
     }
 }
