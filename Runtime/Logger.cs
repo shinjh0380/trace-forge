@@ -81,8 +81,15 @@ namespace TraceForge
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine(
-                        $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                    try
+                    {
+                        Console.Error.WriteLine(
+                            $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                    }
+                    catch
+                    {
+                        // Last-resort reporting must not interrupt dispatch to remaining sinks.
+                    }
                 }
             }
         }

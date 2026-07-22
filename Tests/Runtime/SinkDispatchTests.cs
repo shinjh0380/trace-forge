@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using NUnit.Framework;
 
 namespace TraceForge.Tests
@@ -19,6 +20,12 @@ namespace TraceForge.Tests
         {
             public void Write(in LogEntry entry) => throw new InvalidOperationException("sink error");
             public void Flush() { }
+        }
+
+        private sealed class ThrowingErrorWriter : TextWriter
+        {
+            public override Encoding Encoding => Encoding.UTF8;
+            public override void Write(char value) => throw new IOException("stderr failure");
         }
 
         [SetUp]
@@ -94,6 +101,29 @@ namespace TraceForge.Tests
             {
                 Console.SetError(originalError);
                 capturedError.Dispose();
+            }
+        }
+
+        [Test]
+        public void ThrowingStandardError_DoesNotEscapeOrPreventOtherSinks()
+        {
+            var originalError = Console.Error;
+            var throwingError = new ThrowingErrorWriter();
+            var good = new TestSink();
+
+            try
+            {
+                Console.SetError(throwingError);
+                TF.AddSink(new ThrowingSink());
+                TF.AddSink(good);
+
+                Assert.DoesNotThrow(() => TF.Info("stderr failure must stay isolated"));
+                Assert.AreEqual(1, good.Count);
+            }
+            finally
+            {
+                Console.SetError(originalError);
+                throwingError.Dispose();
             }
         }
 
