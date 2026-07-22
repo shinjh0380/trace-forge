@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using NUnit.Framework;
 
 namespace TraceForge.Tests
@@ -71,6 +72,29 @@ namespace TraceForge.Tests
             TF.AddSink(good);
             Assert.DoesNotThrow(() => TF.Info("should not throw"));
             Assert.AreEqual(1, good.Count);
+        }
+
+        [Test]
+        public void ThrowingSink_ReportsFailureToStandardError()
+        {
+            var originalError = Console.Error;
+            var capturedError = new StringWriter();
+
+            try
+            {
+                Console.SetError(capturedError);
+                TF.AddSink(new ThrowingSink());
+
+                TF.Info("trigger failure");
+
+                StringAssert.Contains("ThrowingSink", capturedError.ToString());
+                StringAssert.Contains("sink error", capturedError.ToString());
+            }
+            finally
+            {
+                Console.SetError(originalError);
+                capturedError.Dispose();
+            }
         }
 
         [Test]

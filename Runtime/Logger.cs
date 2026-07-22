@@ -81,9 +81,8 @@ namespace TraceForge
                 }
                 catch (Exception ex)
                 {
-                    // NOTE: Direct Debug.LogError call is intentional here — sink itself threw an exception,
-                    // so routing through UnityConsoleSink would risk infinite recursion. Convention exception.
-                    Debug.LogError($"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex.Message}");
+                    Console.Error.WriteLine(
+                        $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
                 }
             }
         }
