@@ -5,10 +5,9 @@
 TraceForge uses a **sink-based** architecture:
 
 ```
-TF (facade) → Logger (internal) → ILogSink[] → UnityConsoleSink
-                                              → RingBufferSink
-                                              → FileSink
-                                              → Your custom sink
+TF (facade) -> Logger (internal) -> ILogSink[] -> RingBufferSink
+                                             -> FileSink queue -> writer thread -> file
+                                             -> Your custom sink
 ```
 
 ### Filtering Pipeline
@@ -33,9 +32,8 @@ Category filter takes precedence if set.
 - Sink array: lock-free reads (Interlocked.Exchange writes)
 - Category verbosity: copy-on-write dictionary, volatile reference, lock on write
 - Individual sinks: must be thread-safe themselves
-  - `UnityConsoleSink`: ThreadStatic re-entry guard
   - `RingBufferSink`: lock-based
-  - `FileSink`: lock-based
+  - `FileSink`: bounded `Monitor` queue with a single writer thread
 
 ## Performance Notes
 

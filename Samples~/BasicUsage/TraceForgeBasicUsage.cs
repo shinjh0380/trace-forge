@@ -3,7 +3,7 @@ using TraceForge;
 
 /// <summary>
 /// Demonstrates TraceForge logging setup and usage patterns.
-/// Attach to any GameObject to see output in the Unity Console.
+/// Attach to any GameObject to write logs asynchronously to a file and retain recent entries in memory.
 /// </summary>
 public class TraceForgeBasicUsage : MonoBehaviour
 {
@@ -12,14 +12,11 @@ public class TraceForgeBasicUsage : MonoBehaviour
 
     private void Awake()
     {
-        // Add Unity Console sink (routes to Debug.Log/LogWarning/LogError)
-        TF.AddSink(new UnityConsoleSink());
-
         // Add ring buffer for Log Viewer window (Window > TraceForge > Log Viewer)
         _ringBuffer = new RingBufferSink(capacity: 256);
         TF.AddSink(_ringBuffer);
 
-        // Add file sink (optional)
+        // Add asynchronous file sink. File formatting and I/O run on its writer thread.
         _fileSink = new FileSink(Application.persistentDataPath + "/traceforge.log");
         TF.AddSink(_fileSink);
 
@@ -69,7 +66,11 @@ public class TraceForgeBasicUsage : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Flush and close file sink when done
-        _fileSink?.Dispose();
+        // Remove, flush, and close file sink when done
+        if (_fileSink != null)
+        {
+            TF.RemoveSink(_fileSink);
+            _fileSink.Dispose();
+        }
     }
 }
