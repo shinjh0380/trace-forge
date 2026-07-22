@@ -4,7 +4,8 @@ Lightweight, zero-allocation logging for Unity 6.3 LTS.
 
 ## Features
 
-- **Sink-based** — route logs to Unity Console, ring buffer, file, or your own sink
+- **Sink-based** — route logs to an asynchronous file, ring buffer, or your own sink
+- **Asynchronous file output** — formatting and file I/O run on a dedicated background thread
 - **Zero-allocation** on disabled log paths — verbosity check before any string creation
 - **Category filtering** — per-category verbosity overrides
 - **Compile-time stripping** — remove Trace/Debug levels from release builds
@@ -20,19 +21,26 @@ https://github.com/shinjh0380/trace-forge.git
 ## Quick Start
 
 ```csharp
+using System.IO;
 using TraceForge;
+using UnityEngine;
 
 // Initialize sinks (call once on startup)
-TF.AddSink(new UnityConsoleSink());
+var fileSink = new FileSink(
+    Path.Combine(Application.persistentDataPath, "traceforge.log"));
+var ringBuffer = new RingBufferSink(capacity: 512);
+
+TF.AddSink(fileSink);
+TF.AddSink(ringBuffer);
 
 // Log at various verbosity levels
 TF.Info("Game started");
 TF.Warning(Categories.Network, "Connection slow");
 TF.Error("Something went wrong");
 
-// Avoid expensive formatting when disabled
-if (TF.IsEnabled(Verbosity.Trace))
-    TF.Trace($"Position: {transform.position}");
+// Remove and dispose the owned file sink during shutdown.
+TF.RemoveSink(fileSink);
+fileSink.Dispose();
 ```
 
 ## API Reference
@@ -66,9 +74,6 @@ TF.Info(myCategory, "Custom category log");
 
 ## Sinks
 
-### UnityConsoleSink
-Routes to Unity Console. Verbosity maps to `Debug.Log` / `LogWarning` / `LogError`.
-
 ### RingBufferSink
 In-memory circular buffer. Viewable via **Window > TraceForge > Log Viewer**.
 
@@ -80,15 +85,23 @@ LogEntry[] recent = ringBuffer.GetEntries();
 ```
 
 ### FileSink
-Writes to a file. Implements `IDisposable`.
+Writes asynchronously to a file. `Write()` enqueues each entry into a fixed-capacity bounded queue (4,096 entries by default). A dedicated worker thread formats and writes queued entries. When the queue is full, the caller blocks until capacity becomes available instead of dropping the new entry, providing lossless backpressure during normal operation.
+
+`Flush()` waits until every entry accepted before the call has been written and then flushes the underlying writer. `Dispose()` stops accepting entries, drains the queue, joins the worker thread, and closes the file. It does not promise a physical-disk `fsync`.
+
+`FileSink` implements `IDisposable`; the code that creates it owns it and must remove it from `TF` before disposing it during shutdown.
 
 ```csharp
-using (var fileSink = new FileSink(Application.persistentDataPath + "/game.log"))
-{
-    TF.AddSink(fileSink);
-    // ... logs written ...
-} // file flushed and closed
+var fileSink = new FileSink(logPath, append: true, queueCapacity: 4096);
+TF.AddSink(fileSink);
+
+// ... logs written ...
+
+TF.RemoveSink(fileSink);
+fileSink.Dispose();
 ```
+
+The threaded `FileSink` supports Windows, macOS, Linux, Android, and iOS. It is not supported on WebGL.
 
 ### Custom Sinks
 

@@ -10,7 +10,7 @@ Demonstrates core TraceForge features.
 
 ## What it demonstrates
 
-- Initializing sinks (Console, RingBuffer, File)
+- Initializing sinks (RingBuffer, asynchronous File)
 - All verbosity levels (Trace, Debug, Info, Warning, Error)
 - Category-based logging
 - Custom categories
