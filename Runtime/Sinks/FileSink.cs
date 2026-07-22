@@ -130,15 +130,19 @@ namespace TraceForge
                     ThrowIfFaultedLocked();
                 }
 
-                try
+                lock (_writerLock)
                 {
-                    lock (_writerLock)
+                    lock (_syncRoot)
+                        ThrowIfFaultedLocked();
+
+                    try
+                    {
                         _writer.Flush();
-                }
-                catch (Exception ex)
-                {
-                    RecordWorkerFailure(ex);
-                    throw CreateWriterException(ex);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw CreateWriterException(RecordWorkerFailure(ex));
+                    }
                 }
             }
         }
@@ -165,7 +169,13 @@ namespace TraceForge
                 _worker.Join();
 
                 lock (_syncRoot)
+                {
                     failure = _workerException;
+                    Array.Clear(_queue, 0, _queue.Length);
+                    _head = 0;
+                    _tail = 0;
+                    _count = 0;
+                }
 
                 lock (_writerLock)
                 {
@@ -245,36 +255,44 @@ namespace TraceForge
         {
             lock (_writerLock)
             {
-                Span<char> timestampBuffer = stackalloc char[24];
-                var timestamp = new DateTime(entry.TimestampTicks, DateTimeKind.Utc);
-
-                if (!timestamp.TryFormat(
-                    timestampBuffer,
-                    out int timestampLength,
-                    TimestampFormat,
-                    CultureInfo.InvariantCulture))
+                try
                 {
-                    throw new FormatException("TraceForge could not format the log timestamp.");
+                    Span<char> timestampBuffer = stackalloc char[24];
+                    var timestamp = new DateTime(entry.TimestampTicks, DateTimeKind.Utc);
+
+                    if (!timestamp.TryFormat(
+                        timestampBuffer,
+                        out int timestampLength,
+                        TimestampFormat,
+                        CultureInfo.InvariantCulture))
+                    {
+                        throw new FormatException("TraceForge could not format the log timestamp.");
+                    }
+
+                    _writer.Write('[');
+                    _writer.Write(timestampBuffer.Slice(0, timestampLength));
+                    _writer.Write("] [");
+                    _writer.Write(GetVerbosityName(entry.Verbosity));
+                    _writer.Write("] [");
+                    _writer.Write(entry.Category.Name ?? "Default");
+                    _writer.Write("] ");
+                    _writer.WriteLine(entry.Message ?? string.Empty);
+
+                    if (entry.Exception != null)
+                    {
+                        _writer.Write("Exception: ");
+                        _writer.WriteLine(entry.Exception);
+                    }
                 }
-
-                _writer.Write('[');
-                _writer.Write(timestampBuffer.Slice(0, timestampLength));
-                _writer.Write("] [");
-                _writer.Write(GetVerbosityName(entry.Verbosity));
-                _writer.Write("] [");
-                _writer.Write(entry.Category.Name ?? "Default");
-                _writer.Write("] ");
-                _writer.WriteLine(entry.Message ?? string.Empty);
-
-                if (entry.Exception != null)
+                catch (Exception ex)
                 {
-                    _writer.Write("Exception: ");
-                    _writer.WriteLine(entry.Exception);
+                    RecordWorkerFailure(ex);
+                    throw;
                 }
             }
         }
 
-        private void RecordWorkerFailure(Exception exception)
+        private Exception RecordWorkerFailure(Exception exception)
         {
             lock (_syncRoot)
             {
@@ -283,6 +301,7 @@ namespace TraceForge
 
                 _accepting = false;
                 Monitor.PulseAll(_syncRoot);
+                return _workerException;
             }
         }
 

@@ -44,8 +44,11 @@ namespace TraceForge.Tests
         {
             private readonly ManualResetEventSlim _writeStarted = new ManualResetEventSlim(false);
             private readonly ManualResetEventSlim _releaseFailure = new ManualResetEventSlim(false);
+            private int _flushCallCount;
 
             public override Encoding Encoding => Encoding.UTF8;
+
+            public int FlushCallCount => Volatile.Read(ref _flushCallCount);
 
             public bool WaitUntilWriteStarts(int millisecondsTimeout) => _writeStarted.Wait(millisecondsTimeout);
 
@@ -56,6 +59,11 @@ namespace TraceForge.Tests
                 _writeStarted.Set();
                 _releaseFailure.Wait();
                 throw new IOException("simulated writer failure");
+            }
+
+            public override void Flush()
+            {
+                Interlocked.Increment(ref _flushCallCount);
             }
 
             protected override void Dispose(bool disposing)
@@ -366,6 +374,96 @@ namespace TraceForge.Tests
         }
 
         [Test]
+        public void WriterFailure_UnblocksWriteWaitingOnFullQueueWithIOException()
+        {
+            var writer = new ThrowingTextWriter();
+            var blockedWriteStarted = new ManualResetEventSlim(false);
+            FileSink sink = null;
+            Task firstWriteTask = null;
+            Task secondWriteTask = null;
+            Task blockedWriteTask = null;
+            Task disposeTask = null;
+            bool failureReleased = false;
+
+            try
+            {
+                sink = new FileSink(writer, 1);
+
+                firstWriteTask = StartLongRunningTask(() => sink.Write(CreateEntry("first fails")));
+                Assert.IsTrue(writer.WaitUntilWriteStarts(2000), "Writer did not start within two seconds.");
+                Assert.IsTrue(
+                    SpinWait.SpinUntil(() => firstWriteTask.IsCompleted, 2000),
+                    "First Write did not complete within two seconds after enqueueing.");
+                Assert.IsFalse(firstWriteTask.IsFaulted, firstWriteTask.Exception?.ToString());
+
+                secondWriteTask = StartLongRunningTask(() => sink.Write(CreateEntry("fills queue")));
+                Assert.IsTrue(
+                    SpinWait.SpinUntil(() => secondWriteTask.IsCompleted, 2000),
+                    "Second Write did not fill the available queue slot within two seconds.");
+                Assert.IsFalse(secondWriteTask.IsFaulted, secondWriteTask.Exception?.ToString());
+
+                blockedWriteTask = StartLongRunningTask(
+                    () =>
+                    {
+                        blockedWriteStarted.Set();
+                        sink.Write(CreateEntry("blocked by full queue"));
+                    });
+                Assert.IsTrue(blockedWriteStarted.Wait(2000), "Blocked writer did not start within two seconds.");
+                Assert.IsFalse(
+                    SpinWait.SpinUntil(() => blockedWriteTask.IsCompleted, 100),
+                    "Write completed while the queue was full.");
+
+                writer.ReleaseFailure();
+                failureReleased = true;
+
+                Assert.IsTrue(
+                    SpinWait.SpinUntil(() => blockedWriteTask.IsCompleted, 2000),
+                    "Blocked Write did not complete within two seconds after the writer failed.");
+                Assert.IsTrue(blockedWriteTask.IsFaulted, "Blocked Write completed without the writer failure.");
+                var writeException = blockedWriteTask.Exception.GetBaseException();
+                Assert.IsInstanceOf<IOException>(writeException);
+                StringAssert.Contains("simulated writer failure", writeException.ToString());
+
+                disposeTask = StartLongRunningTask(() => sink.Dispose());
+                Assert.IsTrue(
+                    SpinWait.SpinUntil(() => disposeTask.IsCompleted, 2000),
+                    "Dispose did not complete within two seconds after the writer failed.");
+                Assert.IsTrue(disposeTask.IsFaulted, "Dispose completed without the writer failure.");
+                StringAssert.Contains("simulated writer failure", disposeTask.Exception.GetBaseException().ToString());
+            }
+            finally
+            {
+                if (!failureReleased)
+                    writer.ReleaseFailure();
+
+                if (firstWriteTask != null)
+                    SpinWait.SpinUntil(() => firstWriteTask.IsCompleted, 2000);
+                if (secondWriteTask != null)
+                    SpinWait.SpinUntil(() => secondWriteTask.IsCompleted, 2000);
+                if (blockedWriteTask != null)
+                    SpinWait.SpinUntil(() => blockedWriteTask.IsCompleted, 2000);
+
+                if (sink != null && disposeTask == null)
+                {
+                    disposeTask = StartLongRunningTask(
+                        () =>
+                        {
+                            try { sink.Dispose(); }
+                            catch (IOException) { }
+                        });
+                }
+
+                if (disposeTask != null)
+                    SpinWait.SpinUntil(() => disposeTask.IsCompleted, 2000);
+
+                if (sink == null)
+                    writer.Dispose();
+                if (blockedWriteTask == null || blockedWriteTask.IsCompleted || blockedWriteStarted.IsSet)
+                    blockedWriteStarted.Dispose();
+            }
+        }
+
+        [Test]
         public void WriterFailure_UnblocksFlushAndDisposeWithIOException()
         {
             var writer = new ThrowingTextWriter();
@@ -409,6 +507,7 @@ namespace TraceForge.Tests
                 var flushException = flushTask.Exception.GetBaseException();
                 Assert.IsInstanceOf<IOException>(flushException);
                 StringAssert.Contains("simulated writer failure", flushException.ToString());
+                Assert.AreEqual(0, writer.FlushCallCount, "Underlying Flush ran after the writer failure was recorded.");
 
                 futureWriteTask = StartLongRunningTask(() => sink.Write(CreateEntry("after failure")));
                 Assert.IsTrue(
