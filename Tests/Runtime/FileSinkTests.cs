@@ -232,9 +232,13 @@ namespace TraceForge.Tests
                 using (var recorder = ProfilerRecorder.StartNew(
                     ProfilerCategory.Internal,
                     "GC.Alloc",
-                    16,
+                    1024,
                     ProfilerRecorderOptions.CollectOnlyOnCurrentThread))
                 {
+                    Assert.IsTrue(recorder.Valid);
+                    Assert.IsTrue(recorder.IsRunning);
+                    Assert.Less(recorder.Count, recorder.Capacity);
+
                     long countBefore = recorder.Count;
 
                     for (int i = 0; i < entryCount; i++)
@@ -243,6 +247,8 @@ namespace TraceForge.Tests
                     long allocationSamples = recorder.Count - countBefore;
 
                     sink.Flush();
+                    TestContext.Out.WriteLine(
+                        $"GC_ALLOC_RESULT countBefore={countBefore} capacity={recorder.Capacity} allocationSamples={allocationSamples}");
                     Assert.AreEqual(0, allocationSamples);
                 }
             }

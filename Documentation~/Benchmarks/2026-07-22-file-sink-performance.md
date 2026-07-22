@@ -2,7 +2,7 @@
 
 ## 목적
 
-동기 파일 쓰기를 호출자 스레드에서 수행하던 기존 `FileSink`와 전용 워커 스레드로 쓰기를 이관한 비동기 `FileSink`를 같은 Unity Editor 조건에서 비교한다. 핵심 승인 기준은 비경합 producer 경로의 중앙값 시간이 기존 동기 구현보다 짧고, producer 경로에서 관측되는 GC 할당 이벤트가 없으며, 수락한 로그 100,000건이 모두 파일에 남는 것이다.
+동기 파일 쓰기를 호출자 스레드에서 수행하던 기존 `FileSink`와 전용 워커 스레드로 쓰기를 이관한 비동기 `FileSink`를 같은 Unity Editor 조건에서 비교한다. 핵심 승인 기준은 비포화 producer 경로의 중앙값 시간이 기존 동기 구현보다 짧고, producer 경로에서 관측되는 GC 할당 이벤트가 없으며, 수락한 로그 100,000건이 모두 파일에 남는 것이다.
 
 ## 환경과 대상 커밋
 
@@ -19,11 +19,13 @@
   - 동기: `../async-file-sink-test-host/baseline-benchmark-{1..5}.xml`, `.log`
   - 비동기: `../async-file-sink-test-host/async-benchmark-{1..5}.xml`, `.log`
 
+위 경로는 측정 당시 feature worktree root를 기준으로 한 임시 경로다. 원시 산출물은 repo commit에 포함되지 않으며 최종 정리 과정에서 삭제될 수 있다. 아래 원시 결과 표가 commit에 보존되는 측정 기록이다.
+
 ## 측정 방법
 
 각 결과는 새 Unity 프로세스에서 독립적으로 측정했다. 실행마다 미리 만든 `LogEntry` 하나를 재사용해 1,000회 별도 warm-up을 완료한 후 100,000회를 측정했다. 비동기 측정의 실제 benchmark 파일은 warm-up용 sink와 분리하고 `append: false`로 다시 열었다.
 
-비동기 queue capacity는 101,024로 설정했다. 따라서 100,000건 producer 구간에서는 queue 포화나 backpressure가 발생하지 않는 비경합 경로를 측정했다. sink 생성과 worker 시작은 타이머 밖에 두었다.
+비동기 queue capacity는 101,024로 설정했다. 따라서 100,000건 producer 구간에서는 queue 포화나 backpressure가 발생하지 않는 비포화 경로를 측정했다. 이는 queue saturation과 backpressure만 배제하며 worker thread 및 동기화 잠금 경합 가능성까지 배제하지는 않는다. sink 생성과 worker 시작은 타이머 밖에 두었다.
 
 측정 경계는 다음과 같다.
 
@@ -63,7 +65,7 @@
 
 ## 해석
 
-비동기 구현은 호출자 스레드가 파일 포맷팅과 I/O를 기다리지 않게 해 비경합 producer 중앙값을 378.0583ms에서 28.0278ms로 낮췄다. 이는 로그 호출이 게임 로직을 점유하는 시간을 줄인 결과다.
+비동기 구현은 호출자 스레드가 파일 포맷팅과 I/O를 기다리지 않게 해 비포화 producer 중앙값을 378.0583ms에서 28.0278ms로 낮췄다. 이는 로그 호출이 게임 로직을 점유하는 시간을 줄인 결과다.
 
 반면 모든 항목이 파일에 기록되고 `Flush()`가 끝날 때까지의 중앙값은 378.2148ms에서 549.7390ms로 45.3510% 증가했다. 따라서 이번 결과는 caller latency 개선을 입증하지만 총 drain throughput 개선을 뜻하지 않는다. 종료나 강제 동기화 시점의 전체 배출 속도가 중요한 사용 사례에서는 worker의 포맷팅과 파일 쓰기 처리량을 별도로 최적화해야 한다.
 
@@ -72,7 +74,7 @@
 - 할당 값은 **Unity 6000.3 Windows Editor-specific GC.Alloc event/sample count proxy**다. 할당 바이트 수가 아니며 Unity 버전이나 실행 환경을 넘는 절대값으로 해석할 수 없다.
 - `ProfilerRecorder.Count`와 capacity에 대한 문서 설명과 달리, capacity 16에서 동기 기준선의 관측 Count가 1,000,000까지 증가했다. 이 때문에 동일 Unity 버전, 동일 marker, 동일 옵션에서의 상대 비교에만 사용했다.
 - Windows Editor PlayMode 한 대에서만 측정했다. Player 빌드, Android/iOS 등 모바일 장치와 다른 데스크톱 환경은 측정하지 않았다.
-- oversized queue로 비경합 경로만 측정했다. 기본 capacity 4,096에서 queue 포화 시 발생하는 backpressure와 producer 대기는 이 결과에 포함되지 않는다.
+- oversized queue로 비포화 producer 경로만 측정했다. 기본 capacity 4,096에서 queue 포화 시 발생하는 backpressure와 producer 대기는 이 결과에 포함되지 않는다.
 - wall-clock 결과에는 OS 스케줄링, worker 배치, 파일 시스템 캐시와 다른 시스템 부하의 잡음이 포함된다. 특히 비동기 completion 실행 간 편차가 크므로 중앙값을 사용했다.
 
 ## 결론
