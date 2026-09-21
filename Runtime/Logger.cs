@@ -26,6 +26,8 @@ namespace TraceForge
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
+            Bootstrap.Shutdown();
+
             ILogSink[] sinks;
             lock (_sinksLock)
             {
