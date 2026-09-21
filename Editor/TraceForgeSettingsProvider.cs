@@ -1,13 +1,20 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace TraceForge.Editor
 {
     internal static class TraceForgeSettingsProvider
     {
-        private const string EditorPrefsKeyPrefix = "TraceForge.";
-        private const string MinVerbosityKey = EditorPrefsKeyPrefix + "MinVerbosity";
+        internal const string SettingsPath = "ProjectSettings/TraceForgeSettings.asset";
+        private static TraceForgeSettings _cachedSettings;
+
+        static TraceForgeSettingsProvider()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += ClearCache;
+        }
 
         [SettingsProvider]
         public static SettingsProvider CreateSettingsProvider()
@@ -15,38 +22,113 @@ namespace TraceForge.Editor
             return new SettingsProvider("Project/TraceForge", SettingsScope.Project)
             {
                 label = "TraceForge",
-                guiHandler = (searchContext) => DrawGUI(),
-                keywords = new HashSet<string>(new[] { "TraceForge", "Logging", "Verbosity", "Sink" })
+                guiHandler = DrawGUI,
+                keywords = new HashSet<string>(new[] { "TraceForge", "Logging", "Verbosity", "Sink", "File" })
             };
         }
 
-        private static void DrawGUI()
+        internal static TraceForgeSettings LoadSettingsIfExists()
         {
-            EditorGUILayout.LabelField("TraceForge Logger Settings", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
-
-            // Min Verbosity
-            var currentVerbosity = (Verbosity)EditorPrefs.GetInt(MinVerbosityKey, (int)Verbosity.Debug);
-            var newVerbosity = (Verbosity)EditorGUILayout.EnumPopup("Global Min Verbosity", currentVerbosity);
-
-            if (newVerbosity != currentVerbosity)
+            if (_cachedSettings != null)
+                return _cachedSettings;
+            if (!File.Exists(SettingsPath))
+                return null;
+            var objects = InternalEditorUtility.LoadSerializedFileAndForget(SettingsPath);
+            if (objects == null)
+                return null;
+            foreach (var value in objects)
             {
-                EditorPrefs.SetInt(MinVerbosityKey, (int)newVerbosity);
-                TF.SetMinVerbosity(newVerbosity);
+                var settings = value as TraceForgeSettings;
+                if (settings != null)
+                {
+                    _cachedSettings = settings;
+                    return settings;
+                }
             }
+            return null;
+        }
 
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Active Sinks", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Sinks are registered at runtime. Use TF.AddSink() in your initialization code.",
-                MessageType.Info
-            );
+        internal static TraceForgeSettings GetOrCreateSettings()
+        {
+            var settings = LoadSettingsIfExists();
+            if (settings != null)
+                return settings;
+            settings = ScriptableObject.CreateInstance<TraceForgeSettings>();
+            settings.name = "TraceForgeSettings";
+            settings.hideFlags = HideFlags.DontSave;
+            _cachedSettings = settings;
+            SaveSettings(settings);
+            return settings;
+        }
+
+        internal static void SaveSettings(TraceForgeSettings settings)
+        {
+            if (settings == null)
+                return;
+            var directory = Path.GetDirectoryName(SettingsPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            InternalEditorUtility.SaveToSerializedFileAndForget(
+                new UnityEngine.Object[] { settings }, SettingsPath, true);
+            _cachedSettings = settings;
+        }
+
+        internal static void ApplySettings(TraceForgeSettings settings)
+        {
+            if (settings == null)
+                return;
+            if (EditorApplication.isPlaying)
+            {
+                Bootstrap.ApplySettings(settings);
+                return;
+            }
+            Logger.SetMinVerbosity(settings.MinVerbosity);
+            Logger.ClearAllCategoryVerbosities();
+            if (settings.CategoryOverrides != null)
+            {
+                foreach (var categoryOverride in settings.CategoryOverrides)
+                    Logger.SetCategoryVerbosity(new LogCategory(categoryOverride.Category), categoryOverride.Verbosity);
+            }
         }
 
         internal static void ApplySavedSettings()
         {
-            var verbosity = (Verbosity)EditorPrefs.GetInt(MinVerbosityKey, (int)Verbosity.Debug);
-            TF.SetMinVerbosity(verbosity);
+            ApplySettings(LoadSettingsIfExists());
+        }
+
+        internal static void ClearCache()
+        {
+            if (_cachedSettings != null)
+                Object.DestroyImmediate(_cachedSettings);
+            _cachedSettings = null;
+        }
+
+        private static void DrawGUI(string searchContext)
+        {
+            var settings = GetOrCreateSettings();
+            using var serialized = new SerializedObject(settings);
+            serialized.Update();
+            EditorGUILayout.LabelField("TraceForge Logger Settings", EditorStyles.boldLabel);
+            EditorGUILayout.Space();
+            EditorGUILayout.PropertyField(serialized.FindProperty("MinVerbosity"), new GUIContent("Global Min Verbosity"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("CategoryOverrides"), new GUIContent("Category Overrides"), true);
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Sinks", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serialized.FindProperty("EnableRingBuffer"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("RingBufferCapacity"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("EnableFileSink"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("FilePath"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("AppendToFile"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("FileQueueCapacity"));
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Unity Integration", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serialized.FindProperty("CaptureUnityLog"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("StackTracePolicy"));
+            if (serialized.ApplyModifiedProperties())
+            {
+                SaveSettings(settings);
+                ApplySettings(settings);
+            }
         }
     }
 }

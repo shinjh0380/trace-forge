@@ -36,7 +36,9 @@
 
 ## 3. Project Settings가 자동 적용되지 않음
 
-### 현재 상태
+**해결됨 (`55a4359`)** — Runtime 설정/부트스트랩 기반. SettingsProvider와 Player 빌드 주입은 이 문서를 갱신한 Phase 2 Editor 커밋에서 통합했다.
+
+### 해결 전 상태
 
 `ApplySavedSettings()`는 존재하지만 자동 초기화 속성이나 호출처가 없다. UI는 `SettingsScope.Project`지만 값은 프로젝트 단위가 아닌 `EditorPrefs`에 저장된다. 플레이어 빌드에도 전달되지 않는다.
 
@@ -44,11 +46,11 @@
 
 설정을 변경한 순간에만 Logger에 반영되며, 도메인 재로드나 에디터 재시작 후 저장값과 실제 런타임 값이 달라질 수 있다.
 
-### 향후 완료 조건
+### 검증 결과
 
-- 설정의 범위를 Editor 개인 설정, 프로젝트 설정, Player 설정 중 하나로 확정한다.
-- 선택한 범위에 맞는 저장 방식을 사용한다.
-- 시작, 도메인 재로드, Play Mode 전환 및 Player 적용을 테스트한다.
+- `ProjectSettings/TraceForgeSettings.asset`을 프로젝트 단위로 저장하고 Provider 편집을 Logger에 즉시 반영한다.
+- Player 빌드에 임시 Preloaded Asset으로 전달하며 성공·실패·저장 상태 재로드 후 원본 목록 복원을 테스트했다.
+- Unity 6000.3.8f1에서 실제 Play Mode 3회 전환과 Windows 개발 Player의 `Awake` 이전 설정 적용을 확인했다. 호스트의 기본 domain reload 설정은 기존 Test Framework 문제로 미검증이며, 반복 검사는 domain reload 비활성 상태에서 실행했다.
 
 ## 4. Zero-allocation 및 compile-time stripping 표현이 과도함
 
@@ -68,7 +70,9 @@
 
 ## 5. Thread safety와 flush 생명주기 계약 불일치
 
-### 현재 상태
+**해결됨 (`55a4359`)** — bootstrap 소유 sink의 종료 flush/dispose 및 subsystem 초기화 전 정리. Editor 전환·재로드 정리는 이 문서를 갱신한 Phase 2 Editor 커밋에서 통합했다.
+
+### 해결 전 상태
 
 기존 문서는 모든 sink가 thread-safe라고 설명했지만 `UnityConsoleSink`는 Main Thread 전용이었다. 또한 `ILogSink.Flush()`는 애플리케이션 종료 시 자동 호출된다고 설명하지만 명시적인 종료 hook은 없고 subsystem registration 시점에만 flush된다.
 
@@ -78,11 +82,11 @@
 
 종료 순서나 sink 제거 방식에 따라 버퍼가 남거나 리소스 해제 책임이 불명확할 수 있다.
 
-### 향후 완료 조건
+### 검증 결과
 
-- `Logger`, `TF`, sink 소유자의 flush 및 dispose 책임을 명문화한다.
-- 애플리케이션 종료, Play Mode 전환, subsystem registration, `TF.Reset()`을 각각 검증한다.
-- 문서와 실제 hook을 일치시킨다.
+- bootstrap이 생성한 sink만 remove → flush → dispose한다. `TF.Reset()`은 사용자 sink를 dispose하지 않으며, 사용자 sink의 정리는 생성한 코드의 책임이다.
+- 실제 Player가 5초 후 종료할 때 `traceforge.log`의 마지막 항목 보존을 확인했다. 반복 Play Mode 전환 사이에도 파일을 독점 쓰기로 다시 열 수 있었다.
+- `Logger.Reset()`의 선행 Shutdown, 사용자 소유권, 등록 중 재진입 종료를 테스트했다. `ILogSink.Flush` XML 문서도 실제 소유권 계약과 일치시켰다.
 
 ## 6. 릴리스 메타데이터 불일치
 

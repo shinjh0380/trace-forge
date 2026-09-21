@@ -123,7 +123,8 @@ namespace TraceForge.Tests.Editor
             TF.AddSink(oldSink);
             yield return null;
             yield return new EnterPlayMode();
-            Assert.IsEmpty(SinkRegistry.RingBuffers, "SubsystemRegistration must clear the previous session.");
+            Assert.AreEqual(1, SinkRegistry.RingBuffers.Length, "Bootstrap must create the new session's default ring buffer.");
+            Assert.AreNotSame(oldSink, SinkRegistry.RingBuffers[0], "The previous session's sink must be released.");
             TF.Reset();
             var currentSink = new RingBufferSink();
             TF.AddSink(currentSink);

@@ -5,7 +5,7 @@
 - Depends on: Phase 1 (`SinkRegistry`)
 - Decisions applied: D2, D3, D4, D9, D10 (resolved question #2: no default file sink in release builds)
 
-> **For agentic workers:** Read `00-orchestration.md` first. All decisions for this phase are confirmed; it can start as soon as Phase 1 is merged to `dev`.
+> **For agentic workers:** Read `00-orchestration.md` first. Phase 1 is committed on `feature/native-logger`. Per the execution request, continue on that branch and defer the merge to `dev` until Session 7.
 
 ## Goal
 
@@ -90,15 +90,15 @@ Ownership (D9): the bootstrap disposes only what it created. User-added sinks ar
 
 ## Steps
 
-- [ ] Add `StackTracePolicy` enum and `TraceForgeSettings` (tests: default values, serialization round-trip)
-- [ ] Implement `Bootstrap` with owned-sink tracking; hook `Application.quitting`
-- [ ] Hook `Bootstrap.Shutdown()` into `Logger.Reset()`
-- [ ] Rewrite `TraceForgeSettingsProvider` against the asset; remove all `EditorPrefs` usage
-- [ ] Implement the build processor with restore-on-post-build
-- [ ] Implement the Editor bootstrap
-- [ ] Update sample and docs
-- [ ] Run `traceforge-api-consistency` (new public types: `TraceForgeSettings`, `StackTracePolicy`)
-- [ ] Run `traceforge-performance-review` (bootstrap must not touch the hot path)
+- [x] Add `StackTracePolicy` enum and `TraceForgeSettings` (tests: default values, serialization round-trip)
+- [x] Implement `Bootstrap` with owned-sink tracking; hook `Application.quitting`
+- [x] Hook `Bootstrap.Shutdown()` into `Logger.Reset()`
+- [x] Rewrite `TraceForgeSettingsProvider` against the asset; remove all `EditorPrefs` usage
+- [x] Implement the build processor with restore-on-post-build
+- [x] Implement the Editor bootstrap
+- [x] Update sample and docs
+- [x] Run `traceforge-api-consistency` (new public types: `TraceForgeSettings`, `StackTracePolicy`)
+- [x] Run `traceforge-performance-review` (bootstrap must not touch the hot path)
 
 ## Tests
 
@@ -117,8 +117,20 @@ Ownership (D9): the bootstrap disposes only what it created. User-added sinks ar
 - Fresh project + package install → `TF.Info()` reaches the Viewer with zero user code; with `EnableFileSink` on, it reaches the file and survives quit.
 - `Editor/TraceForgeSettingsProvider.cs` contains no `EditorPrefs` reference.
 - Deferred issues 3 and 5 marked resolved in `Documentation~/DeferredIssues.md` (with commit references).
-- PR merged to `dev`.
+- Committed on `feature/native-logger`; merge to `dev` is deferred to Session 7 per the execution request (2026-09-22).
+
+## Validation (2026-09-22)
+
+- Unity `6000.3.8f1`, primary runs: `run-tests.ps1 -Platform EditMode -Out phase2-primary-editmode-final` **21/21**, and `-Platform PlayMode -Out phase2-primary-playmode-final` **61/61**, with no skipped tests. Compared with Phase 1, EditMode adds seven package tests and one host test; PlayMode adds eight bootstrap tests.
+- The ignored host test enters/exits Play Mode three times, checks one ring buffer each time, verifies the last file entry, and reopens the file with exclusive write access between sessions. The host retains Phase 1's domain-reload-disabled configuration with scene reload enabled; default domain-reload Test Framework startup is not claimed as validated.
+- Persisted build recovery initially failed with a nested ScriptableObject state object. JSON plus stable `GlobalObjectId` references now restores the exact ordered list, including nulls and duplicates, without a postprocess callback. The idle-update test waits for the asynchronous callback rather than assuming one test-runner yield is an Editor update.
+- `LoggerConfig` had no consumers in Runtime, Editor, tests, samples, or user documentation and was removed as authorized. `Logger.Write` and both `IsEnabled` overloads are unchanged. The `ILogSink.Flush` XML contract now distinguishes automatic bootstrap cleanup from user ownership.
+- `rg -n "EditorPrefs" Editor` and `rg -n -F "Debug.Log" Runtime Editor Samples~`: zero matches. No Runtime assembly references or CI workflows changed.
+- Windows x64 Mono Development build: `Unity.exe -batchmode -quit -executeMethod Phase2BuildVerification.BuildWindows` with the local host and explicit log file. `phase2-build-final.log` records exit **0**; the build report is **Succeeded, Errors=0, PreloadedRestored=True, BeforeCount=0, AfterCount=0**. A temporary imported copy carries the ProjectSettings configuration into the Player and is deleted after restoration. The first build succeeded but the host-only cleanup helper tried to restore an empty scene list; the helper was corrected and the complete invocation rerun successfully.
+- The ignored sample scene runs the copied Basic Usage sample and quits five seconds after startup. Player invocation `TraceForgePhase2.exe -batchmode -nographics -logFile ...` exits **0**; the configured ring capacity of 37 is verified in `Awake`. `Application.persistentDataPath/traceforge.log` ends with **PHASE2_LAST_ENTRY_20260922**, confirming the configured file sink receives and flushes the last entry on quit. Build, scene, helper scripts, XML, and logs stay under the ignored host; Player logs use its dedicated persistent-data directory.
 
 ## Handoff to Phase 3
+
+Execution record: two concurrent `astra_luna_worker` agents (GPT-5.6 Luna, medium; `phase2_runtime` and `phase2_editor`) owned the Runtime and Editor/sample/documentation contracts respectively. The primary inspected and repaired integration details, ran the full suites and real build/Player verification, and clarified the `ILogSink` ownership comment. Independent `astra_review` (GPT-6 Astra, low; `phase2_astra_review`) returned **accept**, checking the actual XML/build/Player evidence and API 23/performance 27 criteria. The explicitly specified `TraceForgeSettings` name is an approved naming exception; unchanged or inapplicable checklist items are not claimed as new coverage. Native token usage is unavailable. Final staging also removed trailing whitespace from new Unity metas without changing GUIDs.
 
 Phase 3 adds `UnityLogCapture` started from `Bootstrap.Initialize()` and stopped from `Shutdown()`, and reads `CaptureUnityLog` / `StackTracePolicy` from the settings asset. Leave a clearly marked extension point in `Bootstrap` for both.

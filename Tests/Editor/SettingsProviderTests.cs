@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using UnityEditor;
+using System.IO;
 
 namespace TraceForge.Tests.Editor
 {
@@ -7,28 +7,42 @@ namespace TraceForge.Tests.Editor
     public class SettingsProviderTests
     {
         [SetUp]
-        public void SetUp() => TF.Reset();
+        public void SetUp()
+        {
+            TF.Reset();
+            _settingsExisted = File.Exists(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath);
+            _settingsBytes = _settingsExisted ? File.ReadAllBytes(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath) : null;
+        }
+
+        private bool _settingsExisted;
+        private byte[] _settingsBytes;
 
         [TearDown]
         public void TearDown()
         {
             TF.Reset();
-            // Clean up EditorPrefs test keys
-            EditorPrefs.DeleteKey("TraceForge.MinVerbosity");
+            TraceForge.Editor.TraceForgeSettingsProvider.ClearCache();
+            if (_settingsExisted)
+                File.WriteAllBytes(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath, _settingsBytes);
+            else if (File.Exists(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath))
+                File.Delete(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath);
         }
 
         [Test]
-        public void ApplySavedSettings_AppliesDefaultVerbosityWhenNoPrefsSet()
+        public void ApplySavedSettings_AppliesDefaultVerbosityWhenNoSettingsAssetExists()
         {
-            EditorPrefs.DeleteKey("TraceForge.MinVerbosity");
+            if (File.Exists(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath))
+                File.Delete(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath);
             TraceForge.Editor.TraceForgeSettingsProvider.ApplySavedSettings();
             Assert.IsTrue(TF.IsEnabled(Verbosity.Debug));
         }
 
         [Test]
-        public void ApplySavedSettings_AppliesSavedVerbosity()
+        public void ApplySavedSettings_AppliesAssetVerbosity()
         {
-            EditorPrefs.SetInt("TraceForge.MinVerbosity", (int)Verbosity.Warning);
+            var settings = TraceForge.Editor.TraceForgeSettingsProvider.GetOrCreateSettings();
+            settings.MinVerbosity = Verbosity.Warning;
+            TraceForge.Editor.TraceForgeSettingsProvider.SaveSettings(settings);
             TraceForge.Editor.TraceForgeSettingsProvider.ApplySavedSettings();
             Assert.IsFalse(TF.IsEnabled(Verbosity.Info));
             Assert.IsTrue(TF.IsEnabled(Verbosity.Warning));

@@ -10,6 +10,12 @@ TF (facade) -> Logger (internal) -> ILogSink[] -> RingBufferSink
                                              -> Your custom sink
 ```
 
+## Bootstrap and settings
+
+After installation, `TF.Info` works without setup code. The Editor and Development builds create a ring buffer for the Log Viewer according to the settings asset at `ProjectSettings/TraceForgeSettings.asset`. Enable the file sink in **Project Settings > TraceForge** to write under `Application.persistentDataPath`; the bootstrap flushes and disposes sinks it created when the application quits.
+
+The settings asset is created on first open and injected into Player preloaded assets for a build; the project's original preloaded asset list is restored afterward. With no settings asset, Release builds create no default sinks. File output is opt-in in every build type. `CaptureUnityLog` and `StackTracePolicy` are reserved for the Phase 3 Unity log bridge. Sinks added by application code remain application-owned and must be removed and disposed by that code.
+
 ### Filtering Pipeline
 
 ```

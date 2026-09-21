@@ -25,14 +25,24 @@ https://github.com/shinjh0380/trace-forge.git
 
 ## Quick Start
 
+TraceForge configures its default sinks from **Project Settings > TraceForge**. In the Editor and Development builds, a ring buffer is available automatically, so logging works without initialization code:
+
+```csharp
+TF.Info("Game started");
+```
+
+The settings asset is stored at `ProjectSettings/TraceForgeSettings.asset`. Enable the file sink there when a player should write to `Application.persistentDataPath`.
+
+Add a sink in code only when you need an additional destination:
+
 ```csharp
 using System.IO;
 using TraceForge;
 using UnityEngine;
 
-// Initialize sinks (call once on startup)
+// Optional additional sinks
 var fileSink = new FileSink(
-    Path.Combine(Application.persistentDataPath, "traceforge.log"));
+    Path.Combine(Application.persistentDataPath, "traceforge-extra.log"));
 var ringBuffer = new RingBufferSink(capacity: 512);
 
 TF.AddSink(fileSink);
@@ -43,7 +53,7 @@ TF.Info("Game started");
 TF.Warning(Categories.Network, "Connection slow");
 TF.Error("Something went wrong");
 
-// Remove and dispose the owned file sink during shutdown.
+// Remove and dispose sinks created by your code during shutdown.
 TF.RemoveSink(fileSink);
 fileSink.Dispose();
 ```
