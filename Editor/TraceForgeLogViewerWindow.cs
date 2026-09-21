@@ -1,5 +1,5 @@
 using System;
-using System.Linq;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 
@@ -8,11 +8,14 @@ namespace TraceForge.Editor
     internal sealed class TraceForgeLogViewerWindow : EditorWindow
     {
         private RingBufferSink _ringBuffer;
+        private RingBufferSink[] _ringBuffers = Array.Empty<RingBufferSink>();
+        private int _selectedRingBufferIndex = -1;
         private LogEntry[] _entries = Array.Empty<LogEntry>();
         private Vector2 _scrollPos;
         private Verbosity _filterVerbosity = Verbosity.Trace;
         private string _filterCategory = string.Empty;
         private double _lastRefreshTime;
+        private int _refreshRequested;
         private const double RefreshInterval = 0.25;
 
         [MenuItem("Window/TraceForge/Log Viewer")]
@@ -25,12 +28,26 @@ namespace TraceForge.Editor
 
         private void OnEnable()
         {
-            // Try to find an existing RingBufferSink
-            RefreshEntries();
+            SinkRegistry.Changed += OnRegistryChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            Reacquire();
+        }
+
+        private void OnDisable()
+        {
+            SinkRegistry.Changed -= OnRegistryChanged;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            _ringBuffer = null;
+            _ringBuffers = Array.Empty<RingBufferSink>();
+            _entries = Array.Empty<LogEntry>();
+            _selectedRingBufferIndex = -1;
+            Interlocked.Exchange(ref _refreshRequested, 0);
         }
 
         private void Update()
         {
+            if (Interlocked.Exchange(ref _refreshRequested, 0) != 0)
+                Reacquire();
             if (EditorApplication.timeSinceStartup - _lastRefreshTime > RefreshInterval)
             {
                 RefreshEntries();
@@ -48,6 +65,16 @@ namespace TraceForge.Editor
         private void DrawToolbar()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            if (_ringBuffers.Length > 0)
+            {
+                var names = new string[_ringBuffers.Length];
+                for (var i = 0; i < names.Length; i++)
+                    names[i] = "Ring Buffer " + (i + 1) + " (" + _ringBuffers[i].Count + ")";
+                var selected = EditorGUILayout.Popup(_selectedRingBufferIndex, names, GUILayout.Width(145));
+                if (selected != _selectedRingBufferIndex)
+                    SelectRingBuffer(selected);
+            }
 
             EditorGUILayout.LabelField("Min Verbosity:", GUILayout.Width(90));
             _filterVerbosity = (Verbosity)EditorGUILayout.EnumPopup(_filterVerbosity, GUILayout.Width(80));
@@ -68,6 +95,12 @@ namespace TraceForge.Editor
 
         private void DrawEntries()
         {
+            if (_ringBuffer == null)
+            {
+                EditorGUILayout.HelpBox("No RingBufferSink registered. Phase 2 bootstrap registers one automatically.", MessageType.Info);
+                return;
+            }
+
             _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
             foreach (var entry in _entries)
@@ -94,16 +127,43 @@ namespace TraceForge.Editor
 
         private void RefreshEntries()
         {
-            if (_ringBuffer != null)
-                _entries = _ringBuffer.GetEntries();
+            _entries = _ringBuffer == null ? Array.Empty<LogEntry>() : _ringBuffer.GetEntries();
         }
 
-        /// <summary>
-        /// Attach a RingBufferSink to display its contents in the viewer.
-        /// </summary>
-        internal void SetRingBuffer(RingBufferSink ringBuffer)
+        private void Reacquire()
         {
-            _ringBuffer = ringBuffer;
+            _ringBuffers = SinkRegistry.RingBuffers;
+            if (_ringBuffers.Length == 0)
+            {
+                _ringBuffer = null;
+                _selectedRingBufferIndex = -1;
+                _entries = Array.Empty<LogEntry>();
+                return;
+            }
+            var selected = Array.IndexOf(_ringBuffers, _ringBuffer);
+            if (selected < 0)
+                selected = 0;
+            _selectedRingBufferIndex = selected;
+            _ringBuffer = _ringBuffers[selected];
+            RefreshEntries();
+        }
+
+        private void OnRegistryChanged()
+        {
+            Interlocked.Exchange(ref _refreshRequested, 1);
+        }
+
+        private void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            Reacquire();
+        }
+
+        private void SelectRingBuffer(int index)
+        {
+            if (index < 0 || index >= _ringBuffers.Length)
+                return;
+            _selectedRingBufferIndex = index;
+            _ringBuffer = _ringBuffers[index];
             RefreshEntries();
         }
 

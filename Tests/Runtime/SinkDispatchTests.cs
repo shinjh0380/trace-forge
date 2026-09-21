@@ -162,5 +162,34 @@ namespace TraceForge.Tests
             TF.Info("not dispatched");
             Assert.AreEqual(0, sink.Count);
         }
+
+        [Test]
+        public void RuntimeAndEditorSources_ContainNoUnityDebugLogCalls()
+        {
+            var packageRoot = FindPackageRoot();
+            var forbidden = new[] { "Debug.Log", "Debug.LogWarning", "Debug.LogError", "Debug.LogException", "Debug.LogFormat" };
+            foreach (var directoryName in new[] { "Runtime", "Editor" })
+            {
+                var directory = Path.Combine(packageRoot, directoryName);
+                foreach (var file in Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories))
+                {
+                    var source = File.ReadAllText(file);
+                    foreach (var token in forbidden)
+                        Assert.IsFalse(source.Contains(token), "Forbidden Unity logging call in " + file + ": " + token);
+                }
+            }
+        }
+
+        private static string FindPackageRoot()
+        {
+#if UNITY_EDITOR
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TF).Assembly);
+            Assert.IsNotNull(packageInfo, "TraceForge package source must be available in the Editor host.");
+            return packageInfo.resolvedPath;
+#else
+            Assert.Ignore("TraceForge package source scan runs only in the Editor.");
+            return null;
+#endif
+        }
     }
 }

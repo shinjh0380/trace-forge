@@ -62,13 +62,13 @@ The comment on the current `Debug.Log` says it exists because `TF.Log` would be 
 
 ## Steps
 
-- [ ] Add `SinkRegistry` and wire it from `Logger` (write the registry tests first)
-- [ ] Add `InternalsVisibleTo("TraceForge.Editor")`
-- [ ] Rewrite Viewer sink acquisition; add the dropdown for multiple sinks
-- [ ] Replace the `Debug.Log` in `TraceForgeMenuItems`
-- [ ] Extend the source scan test to `Editor/`
-- [ ] Run the sample scene in the test host and confirm the Viewer shows entries
-- [ ] Run `traceforge-api-consistency` (no public API change expected — verify)
+- [x] Add `SinkRegistry` and wire it from `Logger` (write the registry tests first)
+- [x] Add `InternalsVisibleTo("TraceForge.Editor")`
+- [x] Rewrite Viewer sink acquisition; add the dropdown for multiple sinks
+- [x] Replace the `Debug.Log` in `TraceForgeMenuItems`
+- [x] Extend the source scan test to `Editor/`
+- [x] Run the sample scene in the test host and confirm the Viewer shows entries
+- [x] Run `traceforge-api-consistency` (no public API change expected — verify)
 
 ## Tests
 
@@ -85,7 +85,18 @@ The comment on the current `Debug.Log` says it exists because `TF.Log` would be 
 - Sample scene Play → entries appear in the Log Viewer.
 - `grep -rn "Debug\.Log" Runtime Editor Samples~` returns nothing.
 - All Phase 0 baseline tests still pass; new Editor tests pass.
-- PR merged to `dev`.
+- Committed on `feature/native-logger`; merge to `dev` is deferred to Session 7 per the execution request (2026-09-22).
+
+## Validation (2026-09-22)
+
+- Unity `6000.3.8f1`: EditMode **13/13** (baseline 5 + 8 new tests); PlayMode **53/53** (baseline 51 + source scan + host-only sample test), no skipped tests.
+- Test-first runs: EditMode 5 passed / 4 failed and PlayMode 51 passed / 1 failed before implementation. Expanded selection/Play Mode tests also failed before the repair (10 passed / 2 failed).
+- Primary verification: `run-tests.ps1 -Platform EditMode -Out phase1-final-editmode-verified` and `run-tests.ps1 -Platform PlayMode -Out phase1-final-playmode-no-domain-reload`. Default domain-reload PlayMode startup intermittently lost the Unity Test Framework controller script before any tests ran. One early retry passed, but the final rerun remained blocked after retries and cache reimport. The ignored host now uses `EnterPlayModeOptions.DisableDomainReload` with scene reload enabled; the final full suite passes in that configuration. Default domain-reload startup remains an environment limitation, not a passing validation claim.
+- The ignored host imports `Samples~/BasicUsage` under `Assets/Phase1SampleVerification`. Its PlayMode test runs the sample in a scene, asserts `SinkRegistry.RingBuffers.Length == 1` after `Awake`, and verifies initialization and gameplay entries in the Viewer.
+- `rg -n -F "Debug.Log" Runtime Editor Samples~`: zero matches. Literal matching is required: the unescaped regex also matches the existing `Debug(LogCategory...)` declaration. The source-scan test is new because the baseline had no scan to extend.
+- Public API declarations and Runtime asmdef dependencies are unchanged. Phase 2 and CI workflow changes are outside this session.
+- Independent review identified a reentrant `Flush()` callback retaining the outer Logger lock. A regression test failed (12 passed / 1 failed); `Reset` now snapshots and clears under the lock while invoking `Flush` outside it. The final test also observes same-thread nested registration and verifies all notifications run without the lock.
+- Execution: one `astra_luna_worker` (GPT-5.6 Luna, medium; `phase1_luna`) owned the listed implementation/test files; the primary inspected and integrated the diff and ran validation. Independent `astra_review` (GPT-6 Astra, low; `phase1_astra_review`) reviewed API 23/performance 27 criteria and returned **accept** after the test-quality repair and reentrant-lock repair. Native token usage is unavailable.
 
 ## Handoff to Phase 2
 

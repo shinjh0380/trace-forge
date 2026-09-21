@@ -26,13 +26,26 @@ namespace TraceForge
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
+            ILogSink[] sinks;
             lock (_sinksLock)
             {
-                var sinks = _sinks;
-                foreach (var sink in sinks)
-                    try { sink.Flush(); } catch { /* ignore */ }
-                Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                // Snapshot under the writer lock, but invoke user sink callbacks outside it.
+                sinks = _sinks;
             }
+
+            foreach (var sink in sinks)
+                try { sink.Flush(); } catch { /* ignore */ }
+
+            bool hadRingBuffers;
+            lock (_sinksLock)
+            {
+                // Logger is the single writer: clear both snapshots together after callbacks return.
+                hadRingBuffers = SinkRegistry.RingBuffers.Length > 0;
+                Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                SinkRegistry.Clear();
+            }
+            if (hadRingBuffers)
+                SinkRegistry.NotifyChanged();
 
             lock (_filterLock)
             {
@@ -141,12 +154,17 @@ namespace TraceForge
                 Array.Copy(current, next, current.Length);
                 next[current.Length] = sink;
                 Interlocked.Exchange(ref _sinks, next);
+                SinkRegistry.Register(sink);
             }
+            if (sink is RingBufferSink)
+                SinkRegistry.NotifyChanged();
         }
 
         internal static bool RemoveSink(ILogSink sink)
         {
             if (sink == null) return false;
+            bool registryChanged = false;
+            bool removed;
             lock (_sinksLock)
             {
                 var current = _sinks;
@@ -156,16 +174,29 @@ namespace TraceForge
                 Array.Copy(current, 0, next, 0, idx);
                 Array.Copy(current, idx + 1, next, idx, current.Length - idx - 1);
                 Interlocked.Exchange(ref _sinks, next);
-                return true;
+                if (Array.IndexOf(next, sink) < 0)
+                {
+                    SinkRegistry.Unregister(sink);
+                    registryChanged = sink is RingBufferSink;
+                }
+                removed = true;
             }
+            if (registryChanged)
+                SinkRegistry.NotifyChanged();
+            return removed;
         }
 
         internal static void ClearSinks()
         {
+            bool hadRingBuffers;
             lock (_sinksLock)
             {
+                hadRingBuffers = SinkRegistry.RingBuffers.Length > 0;
                 Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                SinkRegistry.Clear();
             }
+            if (hadRingBuffers)
+                SinkRegistry.NotifyChanged();
         }
 
         internal static Verbosity GetMinVerbosity() => (Verbosity)_globalMinVerbosityInt;
