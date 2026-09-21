@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "plugin": "astra-orchestrator",
+  "files": {
+    ".codex/agents/astra-luna-worker.toml": "d0c008a7391f75bbe1116f896714bc80653b26fc92dc4072610f606c806203f5",
+    ".codex/agents/astra-review.toml": "fab0c9e119b621af09214d21762b1c12470d07ebd59280a43c311dd6c17df5d0",
+    ".agents/skills/astra-orchestrator/SKILL.md": "11063e1be3b4448738148c647d23b4638d85f63dee0f0801685a7866ef2b6dce",
+    ".agents/skills/astra-orchestrator/agents/openai.yaml": "bac8d0c955c58148b348282a3fb7347be3763cc58015ebbfb34b093667adc52a",
+    ".agents/skills/astra-orchestrator/references/contracts.md": "dff8c6fac33875a1a028b7f0d503bd8ff59bf5d606977998c359d1aa1a78d136",
+    ".agents/skills/astra-orchestrator/references/setup.md": "02b02a3e3ce216343efc587c1b305e50bcf9171c474a390259a4906a87672ca9"
+  }
+}
