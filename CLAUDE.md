@@ -67,6 +67,7 @@ Unity 6.3 LTS UPM 경량 로깅 패키지.
 - 모든 개발은 `dev`에서 진행. `main`에서 직접 커밋 금지.
 - 머지: `dev → main` 단방향. `traceforge-release-merge` 스킬 사용.
 - .gitignore: 브랜치마다 다름 (main은 `.claude/`와 `CLAUDE.md`를 ignore).
+- Codex 툴링(`.agents/`, `.codex/`, `AGENTS.md`)과 루트 문서 메타(`CLAUDE.md.meta`, `AGENTS.md.meta`)도 dev 전용이며 release merge에서 제외한다. main의 `.gitignore` 규칙 추가는 Session 7의 0.3.0 release merge에서만 처리한다.
 
 ## 코딩 컨벤션
 
