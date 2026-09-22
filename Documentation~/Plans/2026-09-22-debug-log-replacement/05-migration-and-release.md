@@ -71,7 +71,7 @@ Findings (2026-09-22): GameCI's `unity-test-runner@v4` supports UPM packages via
 
 Since the package root is the repository root, `.github/workflows/test.yml` checks out into `package/` and uses `packageMode: true`. The three jobs use Unity `6000.0.84f1` (default), `6000.3.8f1` (default), and `6000.3.8f1` (both strip symbols). Each runs EditMode and PlayMode without coverage instrumentation, with distinct checks and XML artifacts. Package-mode Library caching is not supported by GameCI and is omitted.
 
-The strip job writes ignored response files and their metas in `Runtime/` and `Tests/Runtime/`, with `-define:TRACEFORGE_STRIP_TRACE` and `-define:TRACEFORGE_STRIP_DEBUG` on separate lines. No response file is committed. A job-local derived Unity image contains only the non-secret `TRACEFORGE_CI_EXPECT_STRIPPED=1` environment setting, because arbitrary action environment variables are not forwarded into GameCI's container. Credentials remain action environment secrets and are never Docker build arguments or image layers. A post-run XML check requires both platforms to pass and the stripped probe marker to be present.
+The strip job writes ignored response files and their metas in `Runtime/` and `Tests/Runtime/`, with `-define:TRACEFORGE_STRIP_TRACE` and `-define:TRACEFORGE_STRIP_DEBUG` on separate lines. No response file is committed. The action pins GameCI CLI `v0.1.69` and uses its documented `GAME_CI_DOCKER_ENV` option to forward `TRACEFORGE_CI_EXPECT_STRIPPED=1` into the strip container. Arbitrary action environment variables alone are not forwarded. `GAME_CI_COVERAGE_ENABLED=false` disables instrumentation without the action's incompatible `--no-coverageEnabled` argument. Credentials remain action environment secrets; no custom image or credential build arguments are needed. A post-run XML check requires both platforms to pass and the stripped probe marker to be present.
 
 Checks before enabling:
 
@@ -111,7 +111,7 @@ Checks before enabling:
 - Negative control: with expectation environment variable `1` and no response files, the probe test fails; with response files, both Runtime probes are true and the test passes. The workflow's XML verification code passes against both real result sets.
 - Local PlayMode uses the previously established domain-reload workaround; original host settings, the host-only test, and generated response files/metas are restored after verification.
 - Package URLs are canonical; author name/email and version 0.2.0 are unchanged. Historical performance rig reproducibility remains a documented Phase 4 limitation; this session makes no new timing claim.
-- CI execution is pending the reviewed commit and push. Release operations below remain for Session 7.
+- First CI run `35688902916` failed all three jobs before Unity started: `Unknown argument: noCoverageEnabled`. The action/CLI argument mismatch is repaired using the pinned CLI environment options above; the next remote run is pending. Release operations below remain for Session 7.
 
 ## Completion Criteria
 

@@ -1,9 +1,11 @@
 # GameCI package-mode tests. The package is checked out below ./package because
 # packageMode creates a temporary host project around that directory. Unity's
 # CLI has no supported scripting-defines flag for this action, so the strip job
-# generates ignored csc.rsp files for both Runtime and Tests/Runtime. Its local
-# custom image supplies TRACEFORGE_CI_EXPECT_STRIPPED=1; arbitrary action env is
-# not assumed to cross the GameCI container boundary.
+# generates ignored csc.rsp files for both Runtime and Tests/Runtime.
+# GAME_CI_DOCKER_ENV forwards the non-secret strip expectation into the GameCI
+# container. coverageEnabled=false is intentionally passed through the CLI's
+# GAME_CI_COVERAGE_ENABLED env because @v4's negated CLI argument is rejected by
+# the GameCI CLI parser.
 name: test
 
 on:
@@ -30,15 +32,12 @@ jobs:
           - id: unity-6000.0-default
             unityVersion: 6000.0.84f1
             strip: false
-            customImage: ''
           - id: unity-6000.3-default
             unityVersion: 6000.3.8f1
             strip: false
-            customImage: ''
           - id: unity-6000.3-stripped
             unityVersion: 6000.3.8f1
             strip: true
-            customImage: traceforge-ci-stripped:6000.3.8f1
 
     steps:
       - name: Checkout package
@@ -47,7 +46,7 @@ jobs:
           path: package
           lfs: true
 
-      - name: Prepare strip response files and local image
+      - name: Prepare strip response files
         if: matrix.strip
         shell: bash
         run: |
@@ -55,9 +54,6 @@ jobs:
           printf '%s\n' '-define:TRACEFORGE_STRIP_TRACE' '-define:TRACEFORGE_STRIP_DEBUG' > package/Tests/Runtime/csc.rsp
           printf 'fileFormatVersion: 2\nguid: %s\nDefaultImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n' "$(cat /proc/sys/kernel/random/uuid | tr -d '-')" > package/Runtime/csc.rsp.meta
           printf 'fileFormatVersion: 2\nguid: %s\nDefaultImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n' "$(cat /proc/sys/kernel/random/uuid | tr -d '-')" > package/Tests/Runtime/csc.rsp.meta
-          printf '%s\n' \
-            'FROM unityci/editor:ubuntu-6000.3.8f1-linux-il2cpp-3' \
-            'ENV TRACEFORGE_CI_EXPECT_STRIPPED=1' | docker build -t traceforge-ci-stripped:6000.3.8f1 -
 
       - name: Run Unity tests
         uses: game-ci/unity-test-runner@v4
@@ -66,14 +62,15 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           TRACEFORGE_CI_EXPECT_STRIPPED: ${{ matrix.strip && '1' || '0' }}
+          GAME_CI_COVERAGE_ENABLED: 'false'
+          GAME_CI_DOCKER_ENV: TRACEFORGE_CI_EXPECT_STRIPPED=${{ matrix.strip && '1' || '0' }}
         with:
           projectPath: package
           packageMode: true
           unityVersion: ${{ matrix.unityVersion }}
-          customImage: ${{ matrix.customImage }}
           checkName: Unity tests (${{ matrix.id }})
+          cliVersion: v0.1.69
           testMode: All
-          coverageEnabled: false
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify Unity result XML and strip probe
