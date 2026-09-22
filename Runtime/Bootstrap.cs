@@ -19,8 +19,6 @@ namespace TraceForge
         /// <summary>Editor-only settings provider; assigned by the Editor assembly.</summary>
         internal static Func<TraceForgeSettings> EditorSettingsLoader;
 
-        // Phase 3 will add Unity log capture and stack trace policy handling here.
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void InitializeOnLoad()
         {
@@ -66,6 +64,7 @@ namespace TraceForge
             if (settings == null)
             {
                 Logger.SetMinVerbosity(Verbosity.Debug);
+                Logger.SetStackTracePolicy(Logger.GetDefaultStackTracePolicy());
                 Logger.ClearAllCategoryVerbosities();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (SinkRegistry.RingBuffers.Length == 0)
@@ -78,6 +77,7 @@ namespace TraceForge
             }
 
             Logger.SetMinVerbosity(settings.MinVerbosity);
+            Logger.SetStackTracePolicy(settings.StackTracePolicy);
             Logger.ClearAllCategoryVerbosities();
             if (settings.CategoryOverrides != null)
             {

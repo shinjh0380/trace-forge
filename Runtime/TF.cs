@@ -239,6 +239,7 @@ namespace TraceForge
         {
             Logger.ClearSinks();
             Logger.SetMinVerbosity(Verbosity.Debug);
+            Logger.SetStackTracePolicy(Logger.GetDefaultStackTracePolicy());
             Logger.ClearAllCategoryVerbosities();
         }
     }

@@ -281,6 +281,67 @@ namespace TraceForge.Tests
         }
 
         [Test]
+        public void LoggerPath_NonSaturatedProducerPath_ProducesZeroGcAllocEvents()
+        {
+            const int warmupCount = 1000;
+            const int entryCount = 100000;
+            const string message = "logger allocation regression";
+
+            TF.Reset();
+            try
+            {
+                Logger.SetStackTracePolicy(StackTracePolicy.None);
+                var sink = new FileSink(TextWriter.Null, entryCount + 1024);
+                try
+                {
+                    TF.AddSink(sink);
+                    for (int i = 0; i < warmupCount; i++)
+                        TF.Info(message);
+                    sink.Flush();
+
+                    using (var controlRecorder = ProfilerRecorder.StartNew(
+                        ProfilerCategory.Internal,
+                        "GC.Alloc",
+                        1024,
+                        ProfilerRecorderOptions.CollectOnlyOnCurrentThread))
+                    {
+                        Assert.IsTrue(controlRecorder.Valid);
+                        long controlCountBefore = controlRecorder.Count;
+                        object controlAllocation = new object();
+                        GC.KeepAlive(controlAllocation);
+                        Assert.Greater(controlRecorder.Count, controlCountBefore);
+                    }
+
+                    using (var recorder = ProfilerRecorder.StartNew(
+                        ProfilerCategory.Internal,
+                        "GC.Alloc",
+                        1024,
+                        ProfilerRecorderOptions.CollectOnlyOnCurrentThread))
+                    {
+                        Assert.IsTrue(recorder.Valid);
+                        long countBefore = recorder.Count;
+                        for (int i = 0; i < entryCount; i++)
+                            TF.Info(message);
+
+                        long allocationSamples = recorder.Count - countBefore;
+                        sink.Flush();
+                        TestContext.Out.WriteLine($"GC_ALLOC_RESULT loggerPath={allocationSamples}");
+                        Assert.AreEqual(0, allocationSamples);
+                    }
+                }
+                finally
+                {
+                    TF.RemoveSink(sink);
+                    sink.Dispose();
+                }
+            }
+            finally
+            {
+                TF.Reset();
+            }
+        }
+
+        [Test]
         public void Flush_WritesEveryEntryInEnqueueOrder()
         {
             const int count = 256;

@@ -5,6 +5,8 @@
 - Depends on: Phase 2 (`Bootstrap`, `TraceForgeSettings.CaptureUnityLog`, `StackTracePolicy`)
 - Decisions applied: D1, D5 (with `Log → Debug`), D6, D7
 
+Execution request (2026-09-22): implement and commit 3a before 3b on `feature/native-logger`, then obtain one independent Astra review of both. Merge to `dev` stays deferred to Session 7. The explicit `exception, context` overload order takes precedence over API guideline #12's general exception-last rule; context remains last, and existing context-free overloads provide the omitted-context form without optional-parameter ambiguity.
+
 > **For agentic workers:** Read `00-orchestration.md` first. All decisions for this phase are confirmed. This phase changes `LogEntry` and public `TF` overloads; run `traceforge-api-consistency` before opening the PR.
 
 ## Goal
@@ -88,9 +90,9 @@ internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
 
 ## Steps
 
-- [ ] Add `Categories.Unity`, `LogEntry` fields, extended constructor (tests first)
-- [ ] Rewrite `IsEnabled(verbosity, category)` per D1; update `CategoryFilteringTests` for both directions
-- [ ] Add `StackTracePolicy` handling and frame trimming in `Logger`
+- [x] Add `Categories.Unity`, `LogEntry` fields, extended constructor (tests first; execution-order deviation recorded below)
+- [x] Rewrite `IsEnabled(verbosity, category)` per D1; update `CategoryFilteringTests` for both directions
+- [x] Add `StackTracePolicy` handling and frame trimming in `Logger`
 - [ ] Implement `UnityLogCapture` with re-entry guard; wire into `Bootstrap`
 - [ ] Add `TF` context overloads
 - [ ] `FileSink`: stack trace formatting
@@ -123,8 +125,14 @@ internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
 - `CategoryFilteringTests` cover override in both directions and pass.
 - Allocation regression test still reports 0 B on the non-error path.
 - Deferred issue 2 marked resolved in `Documentation~/DeferredIssues.md`.
-- PR merged to `dev`.
+- Phase 3a and 3b committed on `feature/native-logger`; merge to `dev` is deferred to Session 7 by the execution request.
 
 ## Handoff to Phase 4
+
+## Validation: Phase 3a (2026-09-22)
+
+- Primary runs on Unity `6000.3.8f1`: `phase3a-primary-editmode` **21/21**, `phase3a-primary-playmode` **67/67**, no skipped tests. The host retains the documented Phase 2 domain-reload-disabled configuration with scene reload enabled.
+- Test-first execution was missed by the worker. The primary instead verified the regression after implementation: restoring only the old global-first filter produced **65 passed / 2 failed** (`CategoryVerbosity_CanBeSetLowerThanGlobal`, `ClearCategoryVerbosity_RestoresGlobalFilter`), then restoring the new implementation passed all 67. This is a regression proof, not a claim of an earlier red run.
+- The stack-policy tests check the exact calling test method as the first frame. The Logger → FileSink producer regression uses `None`, preallocated messages/queue, and a positive GC allocation control; 100,000 writes produced **0 GC.Alloc events**. Capture-enabled coverage follows in 3b.
 
 Phase 4 re-measures the producer path after this phase's structural changes (`LogEntry` growth, policy check in `Write`, capture subscription). Do not tune performance here; record any suspected regression in the PR description so Phase 4 can target it.

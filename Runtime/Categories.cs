@@ -14,5 +14,7 @@ namespace TraceForge
         public static readonly LogCategory Physics = new LogCategory("Physics");
         public static readonly LogCategory AI = new LogCategory("AI");
         public static readonly LogCategory Performance = new LogCategory("Performance");
+        /// <summary>Unity engine and third-party log category.</summary>
+        public static readonly LogCategory Unity = new LogCategory("Unity");
     }
 }

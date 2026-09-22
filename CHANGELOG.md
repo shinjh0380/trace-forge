@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- Category verbosity overrides now replace the global minimum for that category in both directions.
+
 ## [0.1.0] - 2026-03-07
 
 ### Added

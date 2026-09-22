@@ -24,6 +24,18 @@ namespace TraceForge.Tests
             Assert.AreEqual("message", entry.Message);
             Assert.AreEqual(ex, entry.Exception);
             Assert.AreEqual(ticks, entry.TimestampTicks);
+            Assert.AreEqual(0, entry.ContextInstanceId);
+            Assert.IsNull(entry.StackTrace);
+        }
+
+        [Test]
+        public void LogEntry_ExtendedConstructor_StoresContextAndStackTrace()
+        {
+            var entry = new LogEntry(
+                Verbosity.Error, Categories.Network, "message", null, 17, 42, "at Caller.Method()");
+
+            Assert.AreEqual(42, entry.ContextInstanceId);
+            Assert.AreEqual("at Caller.Method()", entry.StackTrace);
         }
 
         [Test]
@@ -72,6 +84,7 @@ namespace TraceForge.Tests
             Assert.AreEqual("Physics", Categories.Physics.Name);
             Assert.AreEqual("AI", Categories.AI.Name);
             Assert.AreEqual("Performance", Categories.Performance.Name);
+            Assert.AreEqual("Unity", Categories.Unity.Name);
         }
 
         [Test]

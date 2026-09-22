@@ -18,6 +18,13 @@ namespace TraceForge
         // int backing field for Interlocked operations on enum
         private static int _globalMinVerbosityInt = (int)Verbosity.Debug;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private const StackTracePolicy DefaultStackTracePolicy = StackTracePolicy.ErrorAndAbove;
+#else
+        private const StackTracePolicy DefaultStackTracePolicy = StackTracePolicy.None;
+#endif
+        private static int _stackTracePolicyInt = (int)DefaultStackTracePolicy;
+
         // Copy-on-write dictionary; reference itself is volatile for lock-free reads
         private static volatile Dictionary<string, Verbosity> _categoryVerbosities
             = new Dictionary<string, Verbosity>(StringComparer.Ordinal);
@@ -52,6 +59,7 @@ namespace TraceForge
             lock (_filterLock)
             {
                 Interlocked.Exchange(ref _globalMinVerbosityInt, (int)Verbosity.Debug);
+                Interlocked.Exchange(ref _stackTracePolicyInt, (int)DefaultStackTracePolicy);
                 _categoryVerbosities = new Dictionary<string, Verbosity>(StringComparer.Ordinal);
             }
         }
@@ -65,15 +73,12 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
         {
-            if ((int)verbosity < _globalMinVerbosityInt)
-                return false;
-
             // Lock-free read of the dictionary reference (volatile)
             var dict = _categoryVerbosities;
             if (dict.Count > 0 && dict.TryGetValue(category.Name ?? string.Empty, out Verbosity categoryMin))
                 return (int)verbosity >= (int)categoryMin;
 
-            return true;
+            return (int)verbosity >= _globalMinVerbosityInt;
         }
 
         [HideInCallstack]
@@ -82,7 +87,8 @@ namespace TraceForge
             if (!IsEnabled(verbosity, category))
                 return;
 
-            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks);
+            string stackTrace = CaptureStackTrace(verbosity);
+            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks, 0, stackTrace);
 
             // Interlocked.Exchange guarantees we read the latest reference
             var sinks = Interlocked.CompareExchange(ref _sinks, null, null);
@@ -113,6 +119,50 @@ namespace TraceForge
         internal static void SetMinVerbosity(Verbosity verbosity)
         {
             Interlocked.Exchange(ref _globalMinVerbosityInt, (int)verbosity);
+        }
+
+        internal static void SetStackTracePolicy(StackTracePolicy policy)
+        {
+            Interlocked.Exchange(ref _stackTracePolicyInt, (int)policy);
+        }
+
+        internal static StackTracePolicy GetStackTracePolicy()
+        {
+            return (StackTracePolicy)Volatile.Read(ref _stackTracePolicyInt);
+        }
+
+        internal static StackTracePolicy GetDefaultStackTracePolicy()
+        {
+            return DefaultStackTracePolicy;
+        }
+
+        private static string CaptureStackTrace(Verbosity verbosity)
+        {
+            StackTracePolicy policy = (StackTracePolicy)Volatile.Read(ref _stackTracePolicyInt);
+            if (policy == StackTracePolicy.None ||
+                (policy == StackTracePolicy.ErrorAndAbove && (int)verbosity < (int)Verbosity.Error))
+                return null;
+
+            string stackTrace = Environment.StackTrace;
+            string[] lines = stackTrace.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            int firstFrame = 0;
+            while (firstFrame < lines.Length && IsInternalStackFrame(lines[firstFrame]))
+                firstFrame++;
+
+            if (firstFrame == 0)
+                return stackTrace;
+            if (firstFrame == lines.Length)
+                return string.Empty;
+
+            return string.Join(Environment.NewLine, lines, firstFrame, lines.Length - firstFrame);
+        }
+
+        private static bool IsInternalStackFrame(string line)
+        {
+            string trimmed = line.TrimStart();
+            return trimmed.StartsWith("at System.Environment", StringComparison.Ordinal) ||
+                trimmed.StartsWith("at TraceForge.Logger.", StringComparison.Ordinal) ||
+                trimmed.StartsWith("at TraceForge.TF.", StringComparison.Ordinal);
         }
 
         internal static void SetCategoryVerbosity(in LogCategory category, Verbosity verbosity)
