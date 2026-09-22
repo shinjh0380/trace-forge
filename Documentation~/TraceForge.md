@@ -14,13 +14,15 @@ TF (facade) -> Logger (internal) -> ILogSink[] -> RingBufferSink
 
 After installation, `TF.Info` works without setup code. The Editor and Development builds create a ring buffer for the Log Viewer according to the settings asset at `ProjectSettings/TraceForgeSettings.asset`. Enable the file sink in **Project Settings > TraceForge** to write under `Application.persistentDataPath`; the bootstrap flushes and disposes sinks it created when the application quits.
 
-The settings asset is created on first open and injected into Player preloaded assets for a build; the project's original preloaded asset list is restored afterward. With no settings asset, Release builds create no default sinks. File output is opt-in in every build type. `CaptureUnityLog` and `StackTracePolicy` are reserved for the Phase 3 Unity log bridge. Sinks added by application code remain application-owned and must be removed and disposed by that code.
+The settings asset is created on first open and injected into Player preloaded assets for a build; the project's original preloaded asset list is restored afterward. With no settings asset, Release builds create no default sinks. File output is opt-in in every build type. `CaptureUnityLog` routes Unity messages into the `Unity` category (Log → Debug, Warning → Warning, Error/Assert → Error, Exception → Fatal). `StackTracePolicy` controls captured TraceForge stacks; Unity supplied stacks are preserved as received. Sinks added by application code remain application-owned and must be removed and disposed by that code.
+
+Unity capture and the asset's stack policy are applied by the Runtime bootstrap in Play Mode and Players. The existing Edit Mode bootstrap provides a ring buffer and filters only; it does not start Unity capture or apply the asset's stack policy.
 
 ### Filtering Pipeline
 
 ```
 TF.Info(category, message)
-  → Logger.IsEnabled(verbosity, category)?
+  → Logger.IsEnabled(verbosity, category) [category override, otherwise global]
     → No: return (zero allocation)
     → Yes: create LogEntry (stack allocated)
            → dispatch to each ILogSink
@@ -31,7 +33,9 @@ TF.Info(category, message)
 1. **Global**: `TF.SetMinVerbosity(Verbosity.Info)` — filters all categories
 2. **Category**: `TF.SetCategoryVerbosity(Categories.Network, Verbosity.Error)` — overrides for a specific category
 
-Category filter takes precedence if set.
+When an override exists, it completely replaces the global minimum for that category in either direction. Clearing the override restores the global minimum.
+
+`StackTracePolicy.ErrorAndAbove` is the default in Editor and Development builds; Release defaults to `None`. `All` is intended for debugging because stack capture allocates. `None` avoids TraceForge stack capture; Unity's own logging may still allocate before its callback.
 
 ## Thread Safety
 
@@ -74,4 +78,4 @@ public void SetUp()
 }
 ```
 
-`TF.Reset()` resets everything: sinks, global verbosity, category overrides.
+`TF.Reset()` clears registered sinks, global verbosity, category overrides, and the stack trace policy. Bootstrap-owned Unity capture is stopped during shutdown; application-owned sinks remain the caller's responsibility.

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 - Category verbosity overrides now replace the global minimum for that category in both directions.
+- Unity context overloads can make a `null` second argument ambiguous; use a typed `Exception` or `UnityEngine.Object` cast.
 
 ## [0.1.0] - 2026-03-07
 

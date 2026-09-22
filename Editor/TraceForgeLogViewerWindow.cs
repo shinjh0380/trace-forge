@@ -16,6 +16,9 @@ namespace TraceForge.Editor
         private string _filterCategory = string.Empty;
         private double _lastRefreshTime;
         private int _refreshRequested;
+        private int _expandedEntryIndex = -1;
+        private LogEntry _expandedEntry;
+        private bool _hasExpandedEntry;
         private const double RefreshInterval = 0.25;
 
         [MenuItem("Window/TraceForge/Log Viewer")]
@@ -41,6 +44,9 @@ namespace TraceForge.Editor
             _ringBuffers = Array.Empty<RingBufferSink>();
             _entries = Array.Empty<LogEntry>();
             _selectedRingBufferIndex = -1;
+            _expandedEntryIndex = -1;
+            _hasExpandedEntry = false;
+            _expandedEntry = default(LogEntry);
             Interlocked.Exchange(ref _refreshRequested, 0);
         }
 
@@ -103,8 +109,9 @@ namespace TraceForge.Editor
 
             _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
-            foreach (var entry in _entries)
+            for (int entryIndex = 0; entryIndex < _entries.Length; entryIndex++)
             {
+                var entry = _entries[entryIndex];
                 if ((int)entry.Verbosity < (int)_filterVerbosity)
                     continue;
 
@@ -117,7 +124,34 @@ namespace TraceForge.Editor
                 GUI.contentColor = color;
 
                 var timestamp = new DateTime(entry.TimestampTicks, DateTimeKind.Utc).ToString("HH:mm:ss.fff");
-                EditorGUILayout.LabelField($"[{timestamp}] [{entry.Verbosity}] [{entry.Category.Name}] {entry.Message}");
+                EditorGUILayout.BeginHorizontal();
+                if (!string.IsNullOrEmpty(entry.StackTrace))
+                {
+                    bool expanded = _hasExpandedEntry && _expandedEntryIndex == entryIndex;
+                    Rect foldoutRect = GUILayoutUtility.GetRect(16f, EditorGUIUtility.singleLineHeight, GUILayout.Width(16f));
+                    bool nextExpanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none);
+                    if (nextExpanded != expanded)
+                    {
+                        _expandedEntryIndex = nextExpanded ? entryIndex : -1;
+                        _expandedEntry = entry;
+                        _hasExpandedEntry = nextExpanded;
+                    }
+                }
+                if (GUILayout.Button($"[{timestamp}] [{entry.Verbosity}] [{entry.Category.Name}] {entry.Message}", EditorStyles.label))
+                {
+                    _expandedEntryIndex = _expandedEntryIndex == entryIndex ? -1 : entryIndex;
+                    _hasExpandedEntry = _expandedEntryIndex >= 0;
+                    _expandedEntry = entry;
+                    PingContext(entry.ContextInstanceId);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (_expandedEntryIndex == entryIndex && !string.IsNullOrEmpty(entry.StackTrace))
+                {
+                    EditorGUI.indentLevel++;
+                    GUILayout.Label(entry.StackTrace, EditorStyles.wordWrappedLabel, GUILayout.ExpandHeight(true));
+                    EditorGUI.indentLevel--;
+                }
 
                 GUI.contentColor = prevColor;
             }
@@ -128,6 +162,40 @@ namespace TraceForge.Editor
         private void RefreshEntries()
         {
             _entries = _ringBuffer == null ? Array.Empty<LogEntry>() : _ringBuffer.GetEntries();
+            _expandedEntryIndex = FindEntryIndex(_expandedEntry);
+            if (_expandedEntryIndex < 0)
+            {
+                _hasExpandedEntry = false;
+                _expandedEntry = default(LogEntry);
+            }
+        }
+
+        private int FindEntryIndex(LogEntry entry)
+        {
+            if (!_hasExpandedEntry)
+                return -1;
+            for (int i = 0; i < _entries.Length; i++)
+            {
+                var candidate = _entries[i];
+                if (candidate.TimestampTicks == entry.TimestampTicks &&
+                    candidate.Verbosity == entry.Verbosity &&
+                    candidate.ContextInstanceId == entry.ContextInstanceId &&
+                    candidate.Category == entry.Category &&
+                    string.Equals(candidate.Message, entry.Message, StringComparison.Ordinal) &&
+                    string.Equals(candidate.StackTrace, entry.StackTrace, StringComparison.Ordinal) &&
+                    ReferenceEquals(candidate.Exception, entry.Exception))
+                    return i;
+            }
+            return -1;
+        }
+
+        private static void PingContext(int instanceId)
+        {
+            if (instanceId == 0)
+                return;
+            var context = EditorUtility.InstanceIDToObject(instanceId);
+            if (context != null)
+                EditorGUIUtility.PingObject(context);
         }
 
         private void Reacquire()
@@ -138,11 +206,19 @@ namespace TraceForge.Editor
                 _ringBuffer = null;
                 _selectedRingBufferIndex = -1;
                 _entries = Array.Empty<LogEntry>();
+                _expandedEntryIndex = -1;
+                _hasExpandedEntry = false;
+                _expandedEntry = default(LogEntry);
                 return;
             }
             var selected = Array.IndexOf(_ringBuffers, _ringBuffer);
             if (selected < 0)
+            {
                 selected = 0;
+                _expandedEntryIndex = -1;
+                _hasExpandedEntry = false;
+                _expandedEntry = default(LogEntry);
+            }
             _selectedRingBufferIndex = selected;
             _ringBuffer = _ringBuffers[selected];
             RefreshEntries();
@@ -164,6 +240,9 @@ namespace TraceForge.Editor
                 return;
             _selectedRingBufferIndex = index;
             _ringBuffer = _ringBuffers[index];
+            _expandedEntryIndex = -1;
+            _hasExpandedEntry = false;
+            _expandedEntry = default(LogEntry);
             RefreshEntries();
         }
 

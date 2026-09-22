@@ -13,8 +13,12 @@ A lightweight, zero-allocation logging system for Unity 6 with no third-party de
 - **Asynchronous file output** — formatting and file I/O run on a dedicated background thread
 - **Zero-allocation** on disabled log paths — verbosity check before any string creation
 - **Category filtering** — per-category verbosity overrides
+- **Unity log capture** — route engine and third-party messages through the `Unity` category
+- **Context and stacks** — retain Unity context IDs and configurable stack traces without retaining objects
 - **Compile-time stripping** — remove Trace/Debug levels from release builds
 - **Thread-safe** — lock-free hot path with copy-on-write sink array
+
+Unity capture and configured stack policies start in Play Mode/Players; the Edit Mode bootstrap currently supplies a ring buffer and filters only.
 
 ## Installation
 
@@ -74,11 +78,18 @@ fileSink.Dispose();
 | `TF.RemoveSink(ILogSink)` | Unregister a sink |
 | `TF.Reset()` | Reset to default state (useful in tests) |
 
-Same pattern applies to: `Trace`, `Debug`, `Warning`, `Error`, `Fatal`.
+The same no-context pattern applies to `Trace`, `Debug`, `Warning`, `Error`, and `Fatal`. Context overloads are available only for `Log`, `Warning`, `Error`, and `Fatal`; they record the object's instance ID and must be called from the main thread.
+
+```csharp
+TF.Error("Could not load", gameObject);
+TF.Error("Could not load", exception, gameObject);
+```
+
+If a call with an exception and a context passes `null`, cast it to the intended type because `Error("message", null)` is ambiguous; the one-argument `Error("message")` remains unambiguous.
 
 ### Predefined Categories
 
-`Categories.Default`, `Categories.Gameplay`, `Categories.Network`, `Categories.UI`, `Categories.Audio`, `Categories.Physics`, `Categories.AI`, `Categories.Performance`
+`Categories.Default`, `Categories.Gameplay`, `Categories.Network`, `Categories.UI`, `Categories.Audio`, `Categories.Physics`, `Categories.AI`, `Categories.Performance`, `Categories.Unity`
 
 ### Custom Categories
 

@@ -281,6 +281,50 @@ namespace TraceForge.Tests
         }
 
         [Test]
+        public void Write_WithStackTrace_IndentsEachStackLine()
+        {
+            var entry = new LogEntry(
+                Verbosity.Error,
+                Categories.Default,
+                "stacked",
+                null,
+                DateTime.UtcNow.Ticks,
+                0,
+                "at Caller.First()\n at Caller.Second()");
+
+            using (var sink = new FileSink(_tempFile, false))
+            {
+                sink.Write(in entry);
+                sink.Flush();
+            }
+
+            var lines = File.ReadAllLines(_tempFile);
+            Assert.AreEqual(3, lines.Length);
+            Assert.AreEqual("    at Caller.First()", lines[1]);
+            Assert.AreEqual("     at Caller.Second()", lines[2]);
+        }
+
+        [Test]
+        public void Write_WithoutStackTrace_PreservesPhase2Bytes()
+        {
+            var ticks = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc).Ticks;
+            var entry = new LogEntry(Verbosity.Info, Categories.Default, "byte-compatible", null, ticks);
+            using (var sink = new FileSink(_tempFile, false))
+            {
+                sink.Write(in entry);
+                sink.Flush();
+            }
+
+            string expectedLine = "[2026-01-02T03:04:05.000Z] [INFO] [Default] byte-compatible" + Environment.NewLine;
+            var preamble = Encoding.UTF8.GetPreamble();
+            var content = Encoding.UTF8.GetBytes(expectedLine);
+            var expected = new byte[preamble.Length + content.Length];
+            Buffer.BlockCopy(preamble, 0, expected, 0, preamble.Length);
+            Buffer.BlockCopy(content, 0, expected, preamble.Length, content.Length);
+            CollectionAssert.AreEqual(expected, File.ReadAllBytes(_tempFile));
+        }
+
+        [Test]
         public void LoggerPath_NonSaturatedProducerPath_ProducesZeroGcAllocEvents()
         {
             const int warmupCount = 1000;
@@ -291,6 +335,7 @@ namespace TraceForge.Tests
             try
             {
                 Logger.SetStackTracePolicy(StackTracePolicy.None);
+                UnityLogCapture.Start();
                 var sink = new FileSink(TextWriter.Null, entryCount + 1024);
                 try
                 {
@@ -325,7 +370,7 @@ namespace TraceForge.Tests
 
                         long allocationSamples = recorder.Count - countBefore;
                         sink.Flush();
-                        TestContext.Out.WriteLine($"GC_ALLOC_RESULT loggerPath={allocationSamples}");
+                        TestContext.Out.WriteLine($"GC_ALLOC_RESULT loggerPath={allocationSamples}, policy=None, capture=enabled");
                         Assert.AreEqual(0, allocationSamples);
                     }
                 }
@@ -337,6 +382,7 @@ namespace TraceForge.Tests
             }
             finally
             {
+                UnityLogCapture.Stop();
                 TF.Reset();
             }
         }

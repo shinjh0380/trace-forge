@@ -93,12 +93,12 @@ internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
 - [x] Add `Categories.Unity`, `LogEntry` fields, extended constructor (tests first; execution-order deviation recorded below)
 - [x] Rewrite `IsEnabled(verbosity, category)` per D1; update `CategoryFilteringTests` for both directions
 - [x] Add `StackTracePolicy` handling and frame trimming in `Logger`
-- [ ] Implement `UnityLogCapture` with re-entry guard; wire into `Bootstrap`
-- [ ] Add `TF` context overloads
-- [ ] `FileSink`: stack trace formatting
-- [ ] Viewer: ping on click, stack foldout
-- [ ] Docs and CHANGELOG (Breaking: category override semantics)
-- [ ] Run `traceforge-api-consistency` and `traceforge-performance-review`
+- [x] Implement `UnityLogCapture` with re-entry guard; wire into `Bootstrap`
+- [x] Add `TF` context overloads
+- [x] `FileSink`: stack trace formatting
+- [x] Viewer: ping on click, stack foldout
+- [x] Docs and CHANGELOG (Breaking: category override semantics)
+- [x] Run `traceforge-api-consistency` and `traceforge-performance-review`
 
 ## Tests
 
@@ -127,12 +127,24 @@ internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
 - Deferred issue 2 marked resolved in `Documentation~/DeferredIssues.md`.
 - Phase 3a and 3b committed on `feature/native-logger`; merge to `dev` is deferred to Session 7 by the execution request.
 
-## Handoff to Phase 4
-
 ## Validation: Phase 3a (2026-09-22)
 
 - Primary runs on Unity `6000.3.8f1`: `phase3a-primary-editmode` **21/21**, `phase3a-primary-playmode` **67/67**, no skipped tests. The host retains the documented Phase 2 domain-reload-disabled configuration with scene reload enabled.
 - Test-first execution was missed by the worker. The primary instead verified the regression after implementation: restoring only the old global-first filter produced **65 passed / 2 failed** (`CategoryVerbosity_CanBeSetLowerThanGlobal`, `ClearCategoryVerbosity_RestoresGlobalFilter`), then restoring the new implementation passed all 67. This is a regression proof, not a claim of an earlier red run.
 - The stack-policy tests check the exact calling test method as the first frame. The Logger → FileSink producer regression uses `None`, preallocated messages/queue, and a positive GC allocation control; 100,000 writes produced **0 GC.Alloc events**. Capture-enabled coverage follows in 3b.
+
+## Validation: Phase 3b (2026-09-22)
+
+- Primary runs on Unity `6000.3.8f1`: `phase3b-primary-editmode-final` **23/23**, `phase3b-primary-playmode-final` **77/77**, no skipped tests. Relative to Phase 2's 21/61, this adds **18 tests** (15 package tests and three host probes).
+- The user lifted the host restriction. Default domain reload was attempted twice, including a fresh Library cache (the previous cache was preserved), but Unity Test Framework lost its `PlaymodeTestsController` script before test execution. These attempts produced no result XML and are not passes. The successful suites used domain reload disabled and scene reload enabled. The host setting was restored to default afterward; default-domain-reload suite execution remains unverified. Phase 2 acceptance is unchanged.
+- The host-only third-party coroutine exception probe first failed with **67 passed / 1 failed** before the capture bridge; final output is `Artifacts/Phase3/traceforge.log`, containing `FATAL`, `Unity`, the exception marker, and indented original caller frames with `StackTracePolicy.None`.
+- The capture-enabled Logger → FileSink allocation regression reports **0 GC.Alloc events** for 100,000 producer writes with policy `None`, with a positive allocation control. The byte fixture compares the no-stack output with Phase 2's uppercase verbosity, UTF-8 preamble, and platform line endings. Stack output is separately checked.
+- Capture tests cover all five Unity log types, worker-thread dispatch exactly once on that worker, raw stack identity, idempotent start/stop, settings toggle/shutdown, and re-entry. Unity suppresses nested engine callbacks itself; the re-entry test invokes the callback from a sink to exercise TraceForge's own guard directly. Every emitted Unity test log has `LogAssert.Expect`.
+- Host Editor probes verify live/destroyed context ping, no Unity object field in `LogEntry`, and foldout state after ring overwrite, eviction, and sink switching. Source scan `rg -n 'Debug\.Log' Runtime Editor Samples~` returns zero matches; the package scan excludes `Tests/`. Runtime assembly references are unchanged.
+- Execution route: one native `astra_luna_worker` (`/root/phase3_luna`, requested GPT-5.6 Luna/medium), primary diff inspection and integration fixes, then one independent `astra_review` (`/root/phase3_astra_review`, requested GPT-6 Astra/low) after the 3b commit. Native token usage: unavailable.
+- Independent review: **accept** on `4f97694..f3f4aa3`, with no repair round required. The reviewer inspected the actual XML, allocation output, file artifact, and host Viewer tests. All 23 API and 27 performance checklist items were considered; explicit context-last and D7 stack-default requirements take precedence over general guideline wording. The final amendment only records the verdict and clarifies limitations in documentation.
+- Scope limitation: the existing Edit Mode bootstrap creates a ring buffer and applies filters only. This Phase 3 wires capture and configured stack policy through Runtime Bootstrap for Play Mode/Players; Edit Mode capture/policy integration would require a separate change to the Editor bootstrap/settings provider. Phase 2 remains accepted. Ripwire could not recognize the repository during review and was not used as evidence.
+
+## Handoff to Phase 4
 
 Phase 4 re-measures the producer path after this phase's structural changes (`LogEntry` growth, policy check in `Write`, capture subscription). Do not tune performance here; record any suspected regression in the PR description so Phase 4 can target it.

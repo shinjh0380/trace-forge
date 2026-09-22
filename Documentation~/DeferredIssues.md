@@ -20,7 +20,9 @@
 
 ## 2. 카테고리 verbosity override 의미 불일치
 
-### 현재 상태
+**해결됨 (`9b89441`)** — 카테고리 값이 있으면 전역 최소값을 대체하는 true override로 통일했다.
+
+### 해결 전 상태
 
 `Logger.IsEnabled(verbosity, category)`가 전역 최소 verbosity를 먼저 검사해 반환한다. 따라서 카테고리 설정은 전역 필터보다 더 엄격하게 만들 수 있지만 더 낮은 verbosity를 다시 허용할 수 없다. 문서는 카테고리 설정이 전역 값을 override하며 우선한다고 설명한다.
 
@@ -28,11 +30,11 @@
 
 전역 `Info`, 특정 카테고리 `Trace` 같은 설정이 기대와 다르게 동작한다.
 
-### 향후 완료 조건
+### 검증 결과
 
-- 카테고리 설정을 진정한 override로 할지 추가 제한으로 할지 명시적으로 결정한다.
-- 구현, XML 문서, README의 의미를 통일한다.
-- 전역보다 높은 값과 낮은 값 모두에 대한 회귀 테스트를 추가한다.
+- 전역 `Info` / 카테고리 `Trace`에서는 해당 카테고리의 Trace가 통과하고, 전역 `Trace` / 카테고리 `Error`에서는 Info가 차단된다.
+- `ClearCategoryVerbosity` 후 전역 값으로 복귀하며, 카테고리 없는 `IsEnabled(Verbosity)`는 전역 값만 따른다.
+- 기존 필터를 복원한 검증에서 신규 회귀 단정 2건이 실패했고, 새 구현은 Phase 3a PlayMode 67/67로 통과했다. CHANGELOG의 Unreleased에 Breaking 변경을 기록했다.
 
 ## 3. Project Settings가 자동 적용되지 않음
 

@@ -89,6 +89,35 @@ namespace TraceForge
 
             string stackTrace = CaptureStackTrace(verbosity);
             var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks, 0, stackTrace);
+            Dispatch(in entry);
+        }
+
+        [HideInCallstack]
+        internal static void Write(Verbosity verbosity, in LogCategory category, string message, Exception exception, int contextInstanceId)
+        {
+            if (!IsEnabled(verbosity, category))
+                return;
+
+            string stackTrace = CaptureStackTrace(verbosity);
+            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks, contextInstanceId, stackTrace);
+            Dispatch(in entry);
+        }
+
+        internal static void WriteCaptured(
+            Verbosity verbosity,
+            in LogCategory category,
+            string message,
+            string stackTrace)
+        {
+            if (!IsEnabled(verbosity, category))
+                return;
+
+            var entry = new LogEntry(verbosity, category, message, null, DateTime.UtcNow.Ticks, 0, stackTrace);
+            Dispatch(in entry);
+        }
+
+        private static void Dispatch(in LogEntry entry)
+        {
 
             // Interlocked.Exchange guarantees we read the latest reference
             var sinks = Interlocked.CompareExchange(ref _sinks, null, null);

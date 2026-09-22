@@ -73,6 +73,7 @@ namespace TraceForge
                         return;
                 }
 #endif
+                StartUnityCapture(configurationVersion, true);
                 return;
             }
 
@@ -107,6 +108,8 @@ namespace TraceForge
                     path = Path.Combine(Application.persistentDataPath, path);
                 AddOwnedSink(new FileSink(path, settings.AppendToFile, Math.Max(1, settings.FileQueueCapacity)), configurationVersion);
             }
+
+            StartUnityCapture(configurationVersion, settings.CaptureUnityLog);
         }
 
         internal static void Shutdown()
@@ -123,12 +126,33 @@ namespace TraceForge
 
             try
             {
+                UnityLogCapture.Stop();
                 DisposeOwnedSinks();
             }
             finally
             {
                 lock (LifecycleLock)
                     _shuttingDown = false;
+            }
+        }
+
+        private static void StartUnityCapture(int configurationVersion, bool enabled)
+        {
+            if (!enabled)
+            {
+                UnityLogCapture.Stop();
+                return;
+            }
+            lock (LifecycleLock)
+            {
+                if (configurationVersion != _configurationVersion || !_initialized || _shuttingDown)
+                    return;
+            }
+            UnityLogCapture.Start();
+            lock (LifecycleLock)
+            {
+                if (configurationVersion != _configurationVersion || !_initialized || _shuttingDown)
+                    UnityLogCapture.Stop();
             }
         }
 
