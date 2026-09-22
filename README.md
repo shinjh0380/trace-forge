@@ -1,6 +1,6 @@
 # TraceForge
 
-A lightweight, zero-allocation logging system for Unity 6 with no third-party dependencies.
+A logging package for Unity 6 with no third-party dependencies.
 
 ## Requirements
 
@@ -11,12 +11,12 @@ A lightweight, zero-allocation logging system for Unity 6 with no third-party de
 
 - **Sink-based** — route logs to an asynchronous file, ring buffer, or your own sink
 - **Asynchronous file output** — formatting and file I/O run on a dedicated background thread
-- **Zero-allocation** on disabled log paths — verbosity check before any string creation
+- **Disabled-path filtering** — verbosity, category, and sink checks happen before TraceForge creates a `LogEntry`; caller-created arguments are evaluated before any method call
 - **Category filtering** — per-category verbosity overrides
 - **Unity log capture** — route engine and third-party messages through the `Unity` category
 - **Context and stacks** — retain Unity context IDs and configurable stack traces without retaining objects
-- **Compile-time stripping** — remove Trace/Debug levels from release builds
-- **Thread-safe** — lock-free hot path with copy-on-write sink array
+- **Compile-time stripping** — remove Trace/Debug method bodies while keeping call-site C# evaluation rules explicit
+- **Thread-safe registration** — sink registration uses a copy-on-write array, while each sink documents its own threading model
 
 Unity capture and configured stack policies start in Play Mode/Players; the Edit Mode bootstrap currently supplies a ring buffer and filters only.
 
@@ -144,13 +144,27 @@ public class MySink : ILogSink
 
 ## Compile-Time Stripping
 
-Add to your `asmdef` or scripting define symbols:
+Set these as scripting define symbols for the Unity build so they are applied when the package Runtime assembly is compiled:
 
 | Symbol | Effect |
 |--------|--------|
-| `TRACEFORGE_STRIP_TRACE` | Removes all Trace() calls |
-| `TRACEFORGE_STRIP_DEBUG` | Removes all Debug() calls |
-| `TRACEFORGE_DISABLE` | Removes all logging |
+| `TRACEFORGE_STRIP_TRACE` | Preprocessor removes the `TF.Trace` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Trace)` returns `false`. |
+| `TRACEFORGE_STRIP_DEBUG` | Preprocessor removes the `TF.Debug` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Debug)` returns `false`. |
+| `TRACEFORGE_DISABLE` | Preprocessor removes TF logging method bodies and `TF.IsEnabled` returns `false` for every verbosity. Call arguments still follow normal C# evaluation rules. |
+
+For interpolated or otherwise expensive messages, guard the call before constructing the message. The category overload preserves category-specific filtering:
+
+```csharp
+if (TF.IsEnabled(Verbosity.Debug))
+    TF.Debug($"Player {playerId} score {score}");
+
+if (TF.IsEnabled(Verbosity.Trace, Categories.Network))
+    TF.Trace(Categories.Network, BuildPacketSummary());
+```
+
+The guard avoids the work only when its condition is false. It is recommended for disabled verbosity, filtered categories, and configurations with no registered sinks.
+
+Both `IsEnabled` overloads return `false` when no sinks are registered, and the matching overload returns `false` when its Trace or Debug strip symbol is active. Throughput and allocation measurements are reported separately in the [Phase 4 benchmark record](Documentation~/Benchmarks/2026-09-22-native-logger-overhead.md).
 
 ## Editor Tools
 

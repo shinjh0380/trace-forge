@@ -5,6 +5,10 @@
 - Depends on: Phase 3 (all structural changes to `LogEntry` and `Logger.Write` are complete)
 - Decisions applied: D8
 
+Execution request (2026-09-22): work on `feature/native-logger`; do not merge to `dev` or start Phase 5. Use option 2's internal readonly probes without changing the test asmdef, and verify the actual Player strip defines locally; the CI job is deferred to Session 6. The primary runs all benchmarks, and one Luna worker handles the bounded IsEnabled/tests/documentation change, followed by independent Astra review.
+
+Measurement boundary: this protocol calls `FileSink.Write(in entry)` directly with a prebuilt entry, so it measures sink enqueue/copy costs, not `Logger.Write` or its stack-policy read. Configurations 2–4 set the requested policy/capture state, but their direct-call results cannot establish the cost of the Logger policy branch. Record this limitation rather than attribute timing differences to code outside the measured path.
+
 > **For agentic workers:** Read `00-orchestration.md` first. This phase is measurement-driven: do not change hot-path code without a before/after number from the test host. Reference baseline: `Documentation~/Benchmarks/2026-07-22-file-sink-performance.md`.
 
 ## Goal
@@ -31,7 +35,7 @@ Why not `[Conditional]` (D8): it compiles the call only when the symbol is *defi
 | Modify | `README.md` | Rewrite the Features bullets and the Compile-Time Stripping table with the precise guarantees; add the guard pattern as the recommended idiom for interpolated messages |
 | Modify | `Documentation~/TraceForge.md` | Performance Notes section aligned with the README |
 | Modify | `Tests/Runtime/VerbosityFilteringTests.cs` | `IsEnabled` under each strip symbol; `IsEnabled` with zero sinks |
-| Modify | `Tests/Runtime/TraceForge.Tests.Runtime.asmdef` | Add `versionDefines` or a second test asmdef with `defineConstraints` so strip-symbol tests run in a compilation that actually has the symbol |
+| Unchanged | `Tests/Runtime/TraceForge.Tests.Runtime.asmdef` | Execution selects option 2; an ignored host Editor probe verifies the actual Player defines locally |
 | Modify | `Tests/Runtime/FileSinkTests.cs` (allocation test) | Re-run the producer-path allocation check with `StackTracePolicy.None` and with `UnityLogCapture` active |
 | Create | `Documentation~/Benchmarks/<date>-native-logger-overhead.md` | Post-Phase-3 measurement, same method as the 2026-07-22 document |
 | Modify | `Documentation~/DeferredIssues.md` | Mark issue 4 resolved |
@@ -52,22 +56,22 @@ Recommended: option 2 for the default test run plus one CI job with the symbols 
 - Measure: producer time (to the last `Write` return), completion time (to `Flush()` return), producer-thread `GC.Alloc` count via `ProfilerRecorder` (`CollectOnlyOnCurrentThread`).
 - Configurations:
   1. Phase 0 baseline commit (`f95dcc2`) — reproduce the 2026-07-22 numbers to validate the rig
-  2. Post-Phase-3 `dev`, `StackTracePolicy.None`, capture off
-  3. Post-Phase-3 `dev`, `StackTracePolicy.None`, capture on (measures subscription cost, expected ≈ 0)
-  4. Post-Phase-3 `dev`, `StackTracePolicy.ErrorAndAbove`, Info-level entries (policy check cost only)
+  2. Post-Phase-3 `feature/native-logger` with the Phase 4 IsEnabled changes, `StackTracePolicy.None`, capture off
+  3. Same checkout, `StackTracePolicy.None`, capture on (subscription active; no Unity message emitted in the timed region)
+  4. Same checkout, `StackTracePolicy.ErrorAndAbove`, Info-level prebuilt entries (the direct sink call bypasses the policy check)
 - Acceptance: configurations 2–4 median producer time within 5% of configuration 1; producer-thread allocations = 0 in all; file line count = 100,000.
 
 If a regression exceeds 5%, profile `Logger.Write` first: the likely suspects are the policy read (make it a plain static int, like `_globalMinVerbosityInt`) and `LogEntry` copy cost (now larger; confirm sinks still take `in`).
 
 ## Steps
 
-- [ ] Write the `IsEnabled` tests (strip symbols, zero sinks) — they fail first
-- [ ] Implement the `IsEnabled` changes in `TF` and `Logger`
-- [ ] Fix any tests broken by "zero sinks → false" (list them in the PR; expected in `VerbosityFilteringTests` and `CategoryFilteringTests` setups that never add a sink)
-- [ ] Reproduce the 2026-07-22 baseline on the rig (configuration 1)
-- [ ] Run configurations 2–4; write the benchmark document
-- [ ] Rewrite README / TraceForge.md performance and stripping sections
-- [ ] Run `traceforge-performance-review`
+- [x] Write the `IsEnabled` tests (strip symbols, zero sinks) — the two zero-sink tests failed before implementation
+- [x] Implement the `IsEnabled` changes in `TF` and `Logger`
+- [x] Fix tests affected by "zero sinks → false" and record their names below
+- [x] Run the 2026-07-22 baseline reproduction (configuration 1); the ±10% historical reproduction criterion failed, as recorded below
+- [x] Run configurations 2–4; write the benchmark document
+- [x] Rewrite README / TraceForge.md performance and stripping sections
+- [x] Run `traceforge-performance-review` — code/docs accepted with the limits recorded below; historical rig validity failed
 
 ## Deferred (design separately after Phase 5)
 
@@ -79,8 +83,22 @@ Allocation-free formatting overloads such as `TF.Debug<T0>(string format, T0 arg
 - Benchmark document committed; acceptance thresholds met or the regression is fixed and re-measured.
 - README contains no claim that is not covered by a test or the benchmark document.
 - `traceforge-performance-review` checklist passes.
-- PR merged to `dev`.
+- Both requested Phase 4 commits recorded on `feature/native-logger`; merge to `dev` remains deferred to Session 7.
 
 ## Handoff to Phase 5
 
 Phase 5 wires the strip-symbol CI job and publishes the release. Leave the benchmark rig scripts (if any were written) under `.worktrees/` — they are not committed, per the existing convention.
+
+## Execution and validation (2026-09-22)
+
+- One native `astra_luna_worker` (`/root/phase4_luna`, requested GPT-5.6 Luna/medium) implemented the bounded IsEnabled/tests/docs change. The primary handled host verification, benchmarks, report, and the minimal out-of-worker-scope Editor test setup correction. Token usage: unavailable.
+- Real red run: `phase4-red-no-sinks.xml`, **0 passed / 2 failed**, both expected false but observed true. Final normal runs after restoring the host from benchmarking: `phase4-postbench-editmode` **24/24**, `phase4-postbench-playmode` **83/83**, no skipped tests.
+- Existing zero-sink failures identified before implementation: `SettingsProviderTests.ApplySavedSettings_AppliesDefaultVerbosityWhenNoSettingsAssetExists` and `ApplySavedSettings_AppliesAssetVerbosity`. Their setup now registers a ring buffer. Both Runtime fixtures already registered a test sink; no missing-sink setup was invented there.
+- Existing strip-sensitive expectations updated: `VerbosityFilteringTests.DefaultMinVerbosity_IsDebug`, `Reset_RestoresDefaultMinVerbosity`, `CategoryFilteringTests.CategoryVerbosity_CanBeSetLowerThanGlobal`, and `ClearCategoryVerbosity_RestoresGlobalFilter`; the Editor default-verbosity test also respects the runtime probe.
+- Actual Player defines `TRACEFORGE_STRIP_TRACE;TRACEFORGE_STRIP_DEBUG`: `phase4-stripped-editmode` **24/24**, host output **trace=True debug=True path=stripped**; filtered Runtime fixtures **19/19**. The host Editor test checks the compiled runtime probes and both IsEnabled overloads, not just the configured define string. Defines were restored; no CI workflow was created.
+- [Benchmark report](../../Benchmarks/2026-09-22-native-logger-overhead.md): four configurations × five independent Unity processes, all **allocationSamples=0** and **persisted=100000**. Current producer deltas for 2/3/4 versus 1 are **-1.7682% / -16.7583% / -19.3457%**, so the conditional >5% regression profiling/repair step was not triggered. No Write/policy/copy optimization was made.
+- **Performance approval remains unestablished:** the historical producer reproduction differs by **-38.6777%** and completion by **-46.8544%**, outside ±10%. Checking the execution steps above records the completed measurements, not a passing rig-validity verdict. The direct FileSink protocol cannot measure Logger policy overhead; completion medians also increased versus the current baseline.
+- Original host assets, manifest, package lock, and defines were restored; the baseline worktree was removed. Successful suites/benchmarks used domain reload disabled and scene reload enabled; the original default host setting is restored at the end. Phase 3's default-domain-reload Test Framework limitation remains.
+- Independent review by `/root/phase4_astra_review` (`astra_review`, requested GPT-6 Astra/low): **code/docs accept; overall performance gate not accepted**. The reviewer read all 20 benchmark XML files, CSV, test XML, source and scripts, and matched README claims sentence by sentence. No repair round was required. Runtime/tests were then committed as `61ffa6e`; only result/commit metadata was finalized in documentation afterward.
+- All 27 performance checklist items were considered, not reported as an unconditional 27/27 pass: 1–2, 6–7, 10–11, 13–21 and 23–26 satisfy the checked source/test contracts; 4–5 and 9 are not applicable; 3 follows D8's caller guard; 8 permits the existing sink-failure diagnostic exception path; 12 follows D7's Editor/Development default; 22 retains the existing limitation that a custom sink calling TF recursively has no general recursion guard (Unity capture has its own guard); 27 excludes default-domain-reload runner validation.
+- README audit links asynchronous formatting/I/O and queue/Flush/Dispose behavior to FileSink tests and source, filtering/guards to Runtime tests, stripping to real define compilation and counter tests, registration threading to writer-lock/COW contracts, and measured allocation/timing to the qualified benchmark report. No general speed or allocation guarantee is claimed.

@@ -23,8 +23,8 @@ Unity capture and the asset's stack policy are applied by the Runtime bootstrap 
 ```
 TF.Info(category, message)
   → Logger.IsEnabled(verbosity, category) [category override, otherwise global]
-    → No: return (zero allocation)
-    → Yes: create LogEntry (stack allocated)
+    → No: return before creating a LogEntry
+    → Yes: create a LogEntry value
            → dispatch to each ILogSink
 ```
 
@@ -47,11 +47,14 @@ When an override exists, it completely replaces the global minimum for that cate
 
 ## Performance Notes
 
-- `IsEnabled()` is `[AggressiveInlining]` — inlined at call site
-- All log methods check `IsEnabled` before any string creation
+- `IsEnabled()` is marked `[AggressiveInlining]`; this is an inlining hint to the compiler, not a runtime guarantee.
+- `Logger` checks verbosity, category overrides, and the published sink array before creating a `LogEntry` or dispatching.
 - Use `if (TF.IsEnabled(Verbosity.Trace)) TF.Trace($"...")` for expensive interpolations
-- `LogEntry` is a `readonly struct` — stack allocated
-- `LogCategory` is a `readonly struct` — no heap allocation
+- Use `if (TF.IsEnabled(Verbosity.Trace, Categories.Network))` for expensive category-specific messages.
+- C# evaluates method arguments before entering `TF.Trace` or `TF.Debug`. Compile-time stripping removes the method body, but does not erase the call or its argument evaluation.
+- Both `IsEnabled` overloads return `false` when no sinks are registered; the matching Trace or Debug overload also returns `false` when its strip symbol is active.
+- `LogEntry` and `LogCategory` are `readonly struct` value types; their storage and any sink or queue allocations depend on the surrounding call path.
+- Disabled-path and strip behavior is covered by Runtime filtering tests. Allocation and throughput claims require measurements from the Unity host benchmark described in the [Phase 4 performance contract](Plans/2026-09-22-debug-log-replacement/04-performance-contract.md) and recorded in the [benchmark record](Benchmarks/2026-09-22-native-logger-overhead.md).
 
 ## Verbosity Reference
 

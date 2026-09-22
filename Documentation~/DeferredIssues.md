@@ -54,21 +54,23 @@
 - Player 빌드에 임시 Preloaded Asset으로 전달하며 성공·실패·저장 상태 재로드 후 원본 목록 복원을 테스트했다.
 - Unity 6000.3.8f1에서 실제 Play Mode 3회 전환과 Windows 개발 Player의 `Awake` 이전 설정 적용을 확인했다. 호스트의 기본 domain reload 설정은 기존 Test Framework 문제로 미검증이며, 반복 검사는 domain reload 비활성 상태에서 실행했다.
 
-## 4. Zero-allocation 및 compile-time stripping 표현이 과도함
+## 4. Disabled-path 및 compile-time stripping 계약
 
-### 현재 상태
+**해결됨 (`61ffa6e`)** — 문서가 보장하는 범위를 caller-side guard와 body-level stripping semantics에 맞게 수정했고, sink가 없을 때와 strip probe 조합의 `IsEnabled` 동작을 검증했다. 성능 rig 재현성 판정은 별도 benchmark 보고서의 실패 기록을 따른다.
 
-호출 인자는 `TF.Trace()` 진입 전에 평가되므로 메서드 본문을 전처리기로 비워도 문자열 생성과 부수 효과가 남는다. `IsEnabled()`는 `TRACEFORGE_STRIP_TRACE`와 `TRACEFORGE_STRIP_DEBUG` 또는 등록 sink 유무를 고려하지 않는다.
+### 해결 전 상태
+
+호출 인자는 `TF.Trace()` 진입 전에 평가되므로 메서드 본문을 전처리기로 비워도 문자열 생성과 부수 효과가 남는다. `IsEnabled()`는 `TRACEFORGE_STRIP_TRACE`와 `TRACEFORGE_STRIP_DEBUG`, 등록 sink 유무를 반영하지 않았다.
 
 ### 영향
 
 사용자가 문서의 보장을 신뢰하면 비활성 로그에서도 예상하지 않은 할당과 계산이 발생할 수 있다.
 
-### 향후 완료 조건
+### 해결 내용
 
-- 보장 범위를 정확히 문서화하거나 호출 전 할당을 피하는 API를 설계한다.
-- stripping 심볼별 `IsEnabled()` 동작을 일치시킨다.
-- 메시지 생성 부수 효과와 할당을 검증하는 테스트를 추가한다.
+- README와 본 문서에서 메서드 본문 stripping과 인자 평가의 차이를 명시했다.
+- stripping 심볼과 sink 상태를 반영하도록 `IsEnabled()` 계약을 맞췄다.
+- expensive/interpolated message에는 global/category `IsEnabled()` caller guard를 권장한다.
 
 ## 5. Thread safety와 flush 생명주기 계약 불일치
 
@@ -109,3 +111,13 @@
 - 실제 최소 지원 Unity 버전과 권장 버전을 구분해 표기한다.
 - package 버전, changelog, tag를 동일하게 맞춘다.
 - `dev` 테스트를 사용해 배포용 `main` 패키지를 검증하는 CI 또는 release check를 마련한다.
+
+## 7. Lazy formatting overloads
+
+### 현재 상태
+
+Caller-side guard는 보간과 expensive message construction을 피할 수 있지만, 호출부마다 guard를 작성해야 한다. C# 9/Unity 6 환경에서는 interpolated string handler를 사용할 수 없으므로, allocation-free formatting overloads를 이 Phase에서 구현하지 않는다.
+
+### 향후 방향
+
+`TF.Debug<T0>(string format, T0 arg0)` 같은 overloads와 sink-side lazy formatting은 `LogEntry`가 미포맷 인자를 운반하고 모든 sink가 지연 포맷을 지원하도록 바꾸는 구조적 작업이 필요하다. 별도 설계와 측정 대상으로 남긴다. 자세한 범위는 [Phase 4 Performance Contract — Deferred](Plans/2026-09-22-debug-log-replacement/04-performance-contract.md#deferred-design-separately-after-phase-5)를 따른다.
