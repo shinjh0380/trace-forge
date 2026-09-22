@@ -93,6 +93,15 @@ namespace TraceForge.Tests
 
             Assert.AreEqual(!TF.IsTraceStripped, TF.IsEnabled(Verbosity.Trace));
             Assert.AreEqual(!TF.IsDebugStripped, TF.IsEnabled(Verbosity.Debug));
+
+            if (System.Environment.GetEnvironmentVariable("TRACEFORGE_CI_EXPECT_STRIPPED") == "1")
+            {
+                TestContext.Out.WriteLine("TRACEFORGE_CI_EXPECT_STRIPPED=1 Trace=" + TF.IsTraceStripped + " Debug=" + TF.IsDebugStripped);
+                Assert.IsTrue(TF.IsTraceStripped);
+                Assert.IsTrue(TF.IsDebugStripped);
+                Assert.IsFalse(TF.IsEnabled(Verbosity.Trace));
+                Assert.IsFalse(TF.IsEnabled(Verbosity.Debug));
+            }
         }
 
         [Test]

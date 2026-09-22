@@ -5,6 +5,10 @@
 - Depends on: Phase 4
 - Resolved questions applied: #1 (canonical repository `shinjh0380/trace-forge`), #4 (CI with a Unity Personal license via GameCI)
 
+Execution scope (2026-09-22): Session 6 implements pre-release work on `feature/native-logger`. Keep package version `0.2.0`, backfill its changelog, and retain new changes under `Unreleased`. Session 7 owns release-check execution, version-bump, release-merge/tag, and fresh installation; do not perform those operations here. Validate CI by pushing the feature branch, with ongoing `dev` push/PR triggers and no `main` trigger.
+
+Confirmed corrections: the mapping table below has **10 rows**. Preserve author name/email as identity, and point every package URL at the canonical `shinjh0380` repository. The old-owner check is `rg -n "github\.com/makeitliveforever" . --glob '!.git/**'` (zero hits); it does not inspect the email domain. The strip job generates ignored `csc.rsp` files in `Runtime/` and `Tests/Runtime/`, defines both strip symbols, and requires the Runtime probes to be true when `TRACEFORGE_CI_EXPECT_STRIPPED=1`. Do not use `defineConstraints` for this proof; see Phase 4's updated strategy.
+
 > **For agentic workers:** Read `00-orchestration.md` first. The release steps at the end must use the project's own skills (`traceforge-release-check`, `traceforge-version-bump`, `traceforge-release-merge`); never merge to `main` by hand.
 
 ## Goal
@@ -65,55 +69,15 @@ A Roslyn analyzer would be the proper tool but needs a separate DLL build pipeli
 
 Findings (2026-09-22): GameCI's `unity-test-runner@v4` supports UPM packages via `packageMode: true` on Linux runners, requires an explicit `unityVersion` (no `auto`), and **does not allow the package directory to be the repository root**. A Personal license works: activate once locally through Unity Hub, store the `.ulf` contents as `UNITY_LICENSE` plus `UNITY_EMAIL` / `UNITY_PASSWORD` secrets. Professional licenses use `UNITY_SERIAL` instead.
 
-Since this repository's root *is* the package root, check out into a subdirectory:
+Since the package root is the repository root, `.github/workflows/test.yml` checks out into `package/` and uses `packageMode: true`. The three jobs use Unity `6000.0.84f1` (default), `6000.3.8f1` (default), and `6000.3.8f1` (both strip symbols). Each runs EditMode and PlayMode without coverage instrumentation, with distinct checks and XML artifacts. Package-mode Library caching is not supported by GameCI and is omitted.
 
-```yaml
-name: test
-on:
-  push: { branches: [dev] }
-  pull_request: { branches: [dev] }
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - unityVersion: 6000.0.<latest-LTS-patch>
-            defines: ""
-          - unityVersion: 6000.3.<patch-matching-local>
-            defines: ""
-          - unityVersion: 6000.3.<patch-matching-local>
-            defines: "TRACEFORGE_STRIP_TRACE;TRACEFORGE_STRIP_DEBUG"   # Phase 4 strip-symbol job
-    steps:
-      - uses: actions/checkout@v4
-        with: { path: package, lfs: true }
-      - uses: actions/cache@v4
-        with:
-          path: package/Library
-          key: Library-${{ matrix.unityVersion }}-${{ hashFiles('package/**/*.asmdef') }}
-      - uses: game-ci/unity-test-runner@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: package
-          packageMode: true
-          unityVersion: ${{ matrix.unityVersion }}
-          testMode: All
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          customParameters: -scriptingDefines ${{ matrix.defines }}   # verify the exact flag against the action docs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: test-results-${{ matrix.unityVersion }}, path: artifacts }
-```
+The strip job writes ignored response files and their metas in `Runtime/` and `Tests/Runtime/`, with `-define:TRACEFORGE_STRIP_TRACE` and `-define:TRACEFORGE_STRIP_DEBUG` on separate lines. No response file is committed. A job-local derived Unity image contains only the non-secret `TRACEFORGE_CI_EXPECT_STRIPPED=1` environment setting, because arbitrary action environment variables are not forwarded into GameCI's container. Credentials remain action environment secrets and are never Docker build arguments or image layers. A post-run XML check requires both platforms to pass and the stripped probe marker to be present.
 
 Checks before enabling:
 
-- [ ] Confirm `unityci/editor` images exist for the chosen `6000.x` versions (GameCI publishes per patch; pick ones that exist).
-- [ ] Confirm how `unity-test-runner@v4` passes scripting defines in package mode; if `customParameters` is not honored, fall back to a `csc.rsp` with `-define:` committed only in the strip-test asmdef folder, or a second test asmdef with `defineConstraints` (Phase 4 option 1).
-- [ ] `main` is never built in CI — it is the distribution branch and has no tests. A separate lightweight job may validate `package.json` and `.meta` presence on `main` if desired.
+- [x] Confirmed Docker Hub tags `ubuntu-6000.0.84f1-linux-il2cpp-3` and `ubuntu-6000.3.8f1-linux-il2cpp-3` exist (2026-09-22).
+- [x] Inspected the v4 README, action inputs and current GameCI CLI: custom parameters are forwarded to Unity but no supported scripting-defines CLI flag is documented. Use the approved CI-generated response files and Runtime probe proof; do not use `defineConstraints`.
+- [x] `main` is excluded. Triggers are `dev` pushes/PRs and `feature/native-logger` pushes for this session's verification.
 
 ## Metadata Cleanup (deferred issue 6)
 
@@ -129,16 +93,25 @@ Checks before enabling:
 
 ## Steps
 
-- [ ] Write `Documentation~/Migration.md`
-- [ ] (Optional) implement the migration scanner with tests
-- [ ] Add the CI workflow; register the three secrets; run it on a `dev` PR until green on all matrix entries
-- [ ] Metadata cleanup + `PackageMetaValidationTests` extension
-- [ ] CHANGELOG 0.2.0 and 0.3.0 entries
-- [ ] Update `DeferredIssues.md` (issue 6 resolved; add the lazy-formatting item)
-- [ ] Run `traceforge-package-audit` and `traceforge-release-check`
+- [x] Write `Documentation~/Migration.md`
+- [x] Optional scanner assessed and omitted; the required migration guide is the deliverable for this session
+- [ ] Add the CI workflow using the three user-registered secrets; push `feature/native-logger` and verify all three matrix jobs
+- [x] Metadata cleanup + `PackageMetaValidationTests` extension
+- [x] Backfill CHANGELOG 0.2.0 and retain Phase 1–4 changes under Unreleased (version-bump deferred)
+- [x] Update `DeferredIssues.md` (issue 6 resolved; add the lazy-formatting item)
+- [x] Compare both audit/release checklists item by item and record results in the commit body
+- [ ] Run `traceforge-release-check` for the release (Session 7)
 - [ ] Run `traceforge-version-bump` to 0.3.0
 - [ ] Run `traceforge-release-merge` (`dev → main`); tag `v0.3.0`
 - [ ] Install `main` via Git URL into a fresh Unity 6000.3 project and repeat the Phase 2 completion check (zero-setup `TF.Info` → Viewer) as the final acceptance test
+
+## Session 6 validation
+
+- Local Unity 6000.3.8f1: default EditMode 31/31 and PlayMode 83/83; CI-style csc.rsp EditMode 30/30 and PlayMode 83/83. The stripped EditMode run temporarily excludes the host-only Phase 4 test that checks global Player defines, which are intentionally not used by the CI response-file mechanism. Package tests are all included.
+- Negative control: with expectation environment variable `1` and no response files, the probe test fails; with response files, both Runtime probes are true and the test passes. The workflow's XML verification code passes against both real result sets.
+- Local PlayMode uses the previously established domain-reload workaround; original host settings, the host-only test, and generated response files/metas are restored after verification.
+- Package URLs are canonical; author name/email and version 0.2.0 are unchanged. Historical performance rig reproducibility remains a documented Phase 4 limitation; this session makes no new timing claim.
+- CI execution is pending the reviewed commit and push. Release operations below remain for Session 7.
 
 ## Completion Criteria
 

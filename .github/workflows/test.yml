@@ -1,0 +1,116 @@
+# GameCI package-mode tests. The package is checked out below ./package because
+# packageMode creates a temporary host project around that directory. Unity's
+# CLI has no supported scripting-defines flag for this action, so the strip job
+# generates ignored csc.rsp files for both Runtime and Tests/Runtime. Its local
+# custom image supplies TRACEFORGE_CI_EXPECT_STRIPPED=1; arbitrary action env is
+# not assumed to cross the GameCI container boundary.
+name: test
+
+on:
+  push:
+    branches:
+      - dev
+      - feature/native-logger
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: unity-6000.0-default
+            unityVersion: 6000.0.84f1
+            strip: false
+            customImage: ''
+          - id: unity-6000.3-default
+            unityVersion: 6000.3.8f1
+            strip: false
+            customImage: ''
+          - id: unity-6000.3-stripped
+            unityVersion: 6000.3.8f1
+            strip: true
+            customImage: traceforge-ci-stripped:6000.3.8f1
+
+    steps:
+      - name: Checkout package
+        uses: actions/checkout@v4
+        with:
+          path: package
+          lfs: true
+
+      - name: Prepare strip response files and local image
+        if: matrix.strip
+        shell: bash
+        run: |
+          printf '%s\n' '-define:TRACEFORGE_STRIP_TRACE' '-define:TRACEFORGE_STRIP_DEBUG' > package/Runtime/csc.rsp
+          printf '%s\n' '-define:TRACEFORGE_STRIP_TRACE' '-define:TRACEFORGE_STRIP_DEBUG' > package/Tests/Runtime/csc.rsp
+          printf 'fileFormatVersion: 2\nguid: %s\nDefaultImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n' "$(cat /proc/sys/kernel/random/uuid | tr -d '-')" > package/Runtime/csc.rsp.meta
+          printf 'fileFormatVersion: 2\nguid: %s\nDefaultImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n' "$(cat /proc/sys/kernel/random/uuid | tr -d '-')" > package/Tests/Runtime/csc.rsp.meta
+          printf '%s\n' \
+            'FROM unityci/editor:ubuntu-6000.3.8f1-linux-il2cpp-3' \
+            'ENV TRACEFORGE_CI_EXPECT_STRIPPED=1' | docker build -t traceforge-ci-stripped:6000.3.8f1 -
+
+      - name: Run Unity tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          TRACEFORGE_CI_EXPECT_STRIPPED: ${{ matrix.strip && '1' || '0' }}
+        with:
+          projectPath: package
+          packageMode: true
+          unityVersion: ${{ matrix.unityVersion }}
+          customImage: ${{ matrix.customImage }}
+          checkName: Unity tests (${{ matrix.id }})
+          testMode: All
+          coverageEnabled: false
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Unity result XML and strip probe
+        env:
+          TRACEFORGE_EXPECT_STRIPPED: ${{ matrix.strip && '1' || '0' }}
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          artifacts = Path("artifacts")
+          required = [artifacts / "editmode-results.xml", artifacts / "playmode-results.xml"]
+          for path in required:
+              if not path.is_file():
+                  raise SystemExit(f"missing Unity result XML: {path}")
+              root = ET.parse(path).getroot()
+              attrs = {key.lower(): value for key, value in root.attrib.items()}
+              if int(attrs.get("total", "0")) <= 0 or int(attrs.get("failed", "0")) != 0:
+                  raise SystemExit(f"invalid result counts in {path}: {root.attrib}")
+              if attrs.get("result", "").lower() != "passed":
+                  raise SystemExit(f"result is not Passed in {path}: {root.attrib}")
+
+          playmode = ET.parse(required[1]).getroot()
+          probes = [node for node in playmode.iter() if node.attrib.get("name") == "IsEnabled_TraceAndDebug_MatchStripProbes"]
+          if not probes or any(node.attrib.get("result", "").lower() != "passed" for node in probes):
+              raise SystemExit("required IsEnabled_TraceAndDebug_MatchStripProbes test is missing or failed")
+
+          if os.environ["TRACEFORGE_EXPECT_STRIPPED"] == "1":
+              marker = "TRACEFORGE_CI_EXPECT_STRIPPED=1 Trace=True Debug=True"
+              if not any(marker in "".join(probe.itertext()) for probe in probes):
+                  raise SystemExit(f"missing strip probe marker: {marker}")
+
+      - name: Upload test XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.id }}
+          path: artifacts/*.xml
+          if-no-files-found: warn

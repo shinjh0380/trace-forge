@@ -14,6 +14,10 @@ Thumbs.db
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 
+# CI-only strip probe response files (generated in the workflow)
+csc.rsp
+csc.rsp.meta
+
 # IDE
 .idea/
 .vscode/

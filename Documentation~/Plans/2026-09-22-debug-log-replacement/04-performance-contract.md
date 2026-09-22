@@ -42,12 +42,12 @@ Why not `[Conditional]` (D8): it compiles the call only when the symbol is *defi
 
 ## Strip-Symbol Test Strategy
 
-Tests that assert "`IsEnabled` is false under `TRACEFORGE_STRIP_TRACE`" need the symbol present at compile time. Two options; pick one and document it in the test asmdef:
+Tests that assert "`IsEnabled` is false under `TRACEFORGE_STRIP_TRACE`" need the symbol present in the Runtime assembly at compile time. Use these complementary checks, documented in the CI workflow:
 
-1. **Separate test assembly** `TraceForge.Tests.Runtime.Stripped` with `defineConstraints: ["TRACEFORGE_STRIP_TRACE"]` and the symbol added to the test host's Player scripting defines in CI. Simple, but only one symbol combination per assembly.
-2. **Runtime probe**: expose `internal static bool IsTraceStripped` constants from `TF` (set by the same `#if`) and assert `IsEnabled(Verbosity.Trace) == !IsTraceStripped`. Runs in any configuration and is self-consistent, but does not prove the symbol was applied.
+1. **CI-generated response files**: the strip matrix job writes `Runtime/csc.rsp` and `Tests/Runtime/csc.rsp` inside the checked-out package, each containing `-define:TRACEFORGE_STRIP_TRACE` and `-define:TRACEFORGE_STRIP_DEBUG`. The files are ignored and created only for that job, so the Runtime and test assemblies compile with the same symbols without adding a committed test assembly or relying on an unsupported Unity CLI flag.
+2. **Runtime probe**: expose `internal static readonly bool IsTraceStripped` and `IsDebugStripped` from `TF` (set by the same `#if`) and assert each matching `IsEnabled` result equals the inverse probe. Runs in any configuration and is self-consistent, but alone does not prove the symbol was applied.
 
-Recommended: option 2 for the default test run plus one CI job with the symbols defined (Phase 5 sets that job up) so option 1's proof exists too.
+Recommended: option 2 for the default test run plus the CI-generated response-file job. The test asserts the compiled probes and, when `TRACEFORGE_CI_EXPECT_STRIPPED=1` reaches the test process, asserts both strip probes are true and both `IsEnabled` calls are false.
 
 ## Benchmark Protocol (same as 2026-07-22)
 
