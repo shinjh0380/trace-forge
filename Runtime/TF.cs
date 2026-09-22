@@ -14,6 +14,17 @@ namespace TraceForge
     /// </example>
     public static class TF
     {
+#if TRACEFORGE_STRIP_TRACE
+        internal static readonly bool IsTraceStripped = true;
+#else
+        internal static readonly bool IsTraceStripped = false;
+#endif
+#if TRACEFORGE_STRIP_DEBUG
+        internal static readonly bool IsDebugStripped = true;
+#else
+        internal static readonly bool IsDebugStripped = false;
+#endif
+
         // ── Verbosity shortcuts (default category) ────────────────────────
 
         /// <summary>Logs a Trace-level message to the default category.</summary>
@@ -286,6 +297,14 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsEnabled(Verbosity verbosity)
         {
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_TRACE
+            if (verbosity == Verbosity.Trace)
+                return false;
+#endif
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_DEBUG
+            if (verbosity == Verbosity.Debug)
+                return false;
+#endif
 #if TRACEFORGE_DISABLE
             return false;
 #else
@@ -299,6 +318,14 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsEnabled(Verbosity verbosity, in LogCategory category)
         {
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_TRACE
+            if (verbosity == Verbosity.Trace)
+                return false;
+#endif
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_DEBUG
+            if (verbosity == Verbosity.Debug)
+                return false;
+#endif
 #if TRACEFORGE_DISABLE
             return false;
 #else

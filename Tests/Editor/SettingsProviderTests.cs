@@ -10,6 +10,7 @@ namespace TraceForge.Tests.Editor
         public void SetUp()
         {
             TF.Reset();
+            TF.AddSink(new RingBufferSink());
             _settingsExisted = File.Exists(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath);
             _settingsBytes = _settingsExisted ? File.ReadAllBytes(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath) : null;
         }
@@ -34,7 +35,7 @@ namespace TraceForge.Tests.Editor
             if (File.Exists(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath))
                 File.Delete(TraceForge.Editor.TraceForgeSettingsProvider.SettingsPath);
             TraceForge.Editor.TraceForgeSettingsProvider.ApplySavedSettings();
-            Assert.IsTrue(TF.IsEnabled(Verbosity.Debug));
+            Assert.AreEqual(!TF.IsDebugStripped, TF.IsEnabled(Verbosity.Debug));
         }
 
         [Test]

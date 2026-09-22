@@ -67,12 +67,17 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsEnabled(Verbosity verbosity)
         {
+            if (_sinks.Length == 0)
+                return false;
             return (int)verbosity >= _globalMinVerbosityInt;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
         {
+            if (_sinks.Length == 0)
+                return false;
+
             // Lock-free read of the dictionary reference (volatile)
             var dict = _categoryVerbosities;
             if (dict.Count > 0 && dict.TryGetValue(category.Name ?? string.Empty, out Verbosity categoryMin))

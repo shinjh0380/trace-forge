@@ -47,8 +47,9 @@ namespace TraceForge.Tests
 
             TF.Trace(Categories.Network, "allowed trace");
 
-            Assert.AreEqual(1, _sink.Count);
-            Assert.AreEqual(Verbosity.Trace, _sink.Entries[0].Verbosity);
+            Assert.AreEqual(TF.IsTraceStripped ? 0 : 1, _sink.Count);
+            if (!TF.IsTraceStripped)
+                Assert.AreEqual(Verbosity.Trace, _sink.Entries[0].Verbosity);
         }
 
         [Test]
@@ -65,7 +66,7 @@ namespace TraceForge.Tests
         {
             TF.SetMinVerbosity(Verbosity.Info);
             TF.SetCategoryVerbosity(Categories.Network, Verbosity.Trace);
-            Assert.IsTrue(TF.IsEnabled(Verbosity.Trace, Categories.Network));
+            Assert.AreEqual(!TF.IsTraceStripped, TF.IsEnabled(Verbosity.Trace, Categories.Network));
             TF.ClearCategoryVerbosity(Categories.Network);
 
             Assert.IsFalse(TF.IsEnabled(Verbosity.Trace, Categories.Network));
@@ -79,6 +80,24 @@ namespace TraceForge.Tests
             TF.SetCategoryVerbosity(Categories.AI, Verbosity.Fatal);
             Assert.IsFalse(TF.IsEnabled(Verbosity.Error, Categories.AI));
             Assert.IsTrue(TF.IsEnabled(Verbosity.Fatal, Categories.AI));
+        }
+
+        [Test]
+        public void IsEnabled_WithCategory_ReturnsFalse_WhenNoSinksAreRegistered()
+        {
+            TF.ClearSinks();
+
+            Assert.IsFalse(TF.IsEnabled(Verbosity.Debug, Categories.AI));
+            Assert.IsFalse(TF.IsEnabled(Verbosity.Fatal, Categories.AI));
+        }
+
+        [Test]
+        public void IsEnabled_WithCategory_TraceAndDebug_MatchStripProbes()
+        {
+            TF.SetMinVerbosity(Verbosity.Trace);
+
+            Assert.AreEqual(!TF.IsTraceStripped, TF.IsEnabled(Verbosity.Trace, Categories.AI));
+            Assert.AreEqual(!TF.IsDebugStripped, TF.IsEnabled(Verbosity.Debug, Categories.AI));
         }
 
         [Test]
