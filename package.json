@@ -2,22 +2,22 @@
   "name": "com.skrawberries.traceforge",
   "version": "0.2.0",
   "displayName": "TraceForge",
-  "description": "Lightweight, zero-allocation logging for Unity 6.3 LTS. Sink-based architecture with category and verbosity filtering.",
+  "description": "Lightweight sink-based logging for Unity 6 (minimum 6000.0, tested on 6000.3) with category and verbosity filtering.",
   "unity": "6000.0",
-  "documentationUrl": "https://github.com/makeitliveforever/trace-forge",
-  "changelogUrl": "https://github.com/makeitliveforever/trace-forge/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/makeitliveforever/trace-forge/blob/main/LICENSE.md",
+  "documentationUrl": "https://github.com/shinjh0380/trace-forge",
+  "changelogUrl": "https://github.com/shinjh0380/trace-forge/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/shinjh0380/trace-forge/blob/main/LICENSE.md",
   "keywords": ["logging", "tracing", "debug", "sink", "unity", "traceforge"],
   "category": "Utilities",
   "license": "MIT",
   "author": {
     "name": "MakeItLiveForever",
     "email": "hello@makeitliveforever.com",
-    "url": "https://github.com/makeitliveforever"
+    "url": "https://github.com/shinjh0380/trace-forge"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/makeitliveforever/trace-forge.git"
+    "url": "https://github.com/shinjh0380/trace-forge.git"
   },
   "dependencies": {},
   "samples": [

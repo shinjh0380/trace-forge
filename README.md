@@ -4,7 +4,8 @@ A logging package for Unity 6 with no third-party dependencies.
 
 ## Requirements
 
-- Unity 6.x (6000.0 or later)
+- Minimum Unity version: **6000.0**
+- Tested on Unity **6000.3**
 - API Compatibility Level: **.NET Standard 2.1**
 
 ## Features
@@ -26,6 +27,9 @@ Add via Unity Package Manager using Git URL:
 ```
 https://github.com/shinjh0380/trace-forge.git
 ```
+
+For a step-by-step migration from Unity's `Debug.Log` family, see the
+[migration guide](Documentation~/Migration.md).
 
 ## Quick Start
 

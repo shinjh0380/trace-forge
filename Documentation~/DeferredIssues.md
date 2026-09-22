@@ -4,15 +4,20 @@
 
 ## 1. Log Viewer와 RingBufferSink가 연결되지 않음
 
-### 현재 상태
+**해결됨 (`0381ebd`, Phase 1)** — the Editor bootstrap creates and registers
+the default ring buffer, and the Log Viewer binds to the active registry sink
+across window reopen and Play Mode transitions. Editor tests cover registration
+and release behavior.
+
+### 해결 전 상태
 
 `TraceForgeLogViewerWindow`에는 `SetRingBuffer()`가 있지만 호출 경로가 없다. 샘플이 `RingBufferSink`를 등록해도 Viewer가 해당 인스턴스를 찾거나 전달받지 못한다.
 
-### 영향
+### 당시 영향
 
 제공된 기본 흐름으로는 Log Viewer가 항상 빈 상태로 남는다.
 
-### 향후 완료 조건
+### 완료 내용
 
 - Viewer가 활성 `RingBufferSink`를 명시적인 공개 API 또는 안전한 registry로 연결한다.
 - 창 재오픈과 Play Mode 전환 후에도 올바른 sink를 표시한다.
@@ -94,23 +99,28 @@
 
 ## 6. 릴리스 메타데이터 불일치
 
-### 현재 상태
+**메타데이터 해결됨 (Phase 5)** — package URL과 README 설치 경로를
+`shinjh0380/trace-forge`로 통일하고, 최소 `6000.0`과 테스트 버전 `6000.3`을
+구분했다. `0.2.0` 변경 이력을 보완하고 URL·버전 회귀 테스트를 추가했다.
+CI 실행 결과는 Phase 5 계획에 기록하며, 새 릴리스 버전과 tag 확정은 Session 7에 남긴다.
+
+### 해결 전 상태
 
 - package 버전과 changelog 최신 버전이 다르다.
 - README 설치 URL과 package repository URL이 다르다.
 - Unity 6.3 LTS, Unity 6.x, 최소 `6000.0` 표기가 혼재한다.
 - 배포용 `main`에는 테스트가 없고 자동 검증 흐름이 보이지 않는다.
 
-### 영향
+### 당시 영향
 
 설치 경로, 지원 버전, 변경 이력과 릴리스 신뢰성이 불명확하다.
 
-### 향후 완료 조건
+### 완료 내용
 
-- canonical repository URL을 하나로 통일한다.
-- 실제 최소 지원 Unity 버전과 권장 버전을 구분해 표기한다.
-- package 버전, changelog, tag를 동일하게 맞춘다.
-- `dev` 테스트를 사용해 배포용 `main` 패키지를 검증하는 CI 또는 release check를 마련한다.
+- canonical repository URL을 하나로 통일했다. author name/email은 그대로 유지했다.
+- 최소 지원 Unity 버전과 테스트 버전을 구분했다.
+- package 버전과 changelog의 첫 릴리스 항목을 `0.2.0`으로 맞췄다. 새 버전·tag는 아직 만들지 않았다.
+- `dev` push/PR과 이번 feature 브랜치 검증용 CI를 추가했다. 실제 CI 통과 여부와 릴리스 검증은 별도로 확인한다.
 
 ## 7. Lazy formatting overloads
 
