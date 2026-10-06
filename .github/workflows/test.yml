@@ -6,6 +6,8 @@
 # container. coverageEnabled=false is intentionally passed through the CLI's
 # GAME_CI_COVERAGE_ENABLED env because @v4's negated CLI argument is rejected by
 # the GameCI CLI parser.
+# Personal activation uses Unity account credentials directly; a local .ulf
+# is not forwarded because its manual activation failed timestamp validation.
 name: test
 
 on:
@@ -58,9 +60,9 @@ jobs:
       - name: Run Unity tests
         uses: game-ci/unity-test-runner@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          GAME_CI_UNITY_LICENSING_METHOD: personal
           TRACEFORGE_CI_EXPECT_STRIPPED: ${{ matrix.strip && '1' || '0' }}
           GAME_CI_COVERAGE_ENABLED: 'false'
           GAME_CI_DOCKER_ENV: TRACEFORGE_CI_EXPECT_STRIPPED=${{ matrix.strip && '1' || '0' }}
