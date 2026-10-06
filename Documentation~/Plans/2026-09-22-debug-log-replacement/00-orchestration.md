@@ -163,7 +163,7 @@ TF ─► Logger ─► ILogSink[] (unchanged)
 | 1 | Canonical repository URL | **`https://github.com/shinjh0380/trace-forge`**. `package.json` (`makeitliveforever`) is wrong and must be corrected | Phase 5 |
 | 2 | Default sink in release builds | **D4 as recommended**: none. Release builds log only what the settings asset enables | Phase 2 |
 | 3 | `LogType.Log` mapping in Unity log capture | **Lowered to `Debug`** (see D5) | Phase 3 |
-| 4 | CI environment | **Feasible with a Unity Personal license.** GameCI `unity-test-runner@v4` activates from a `.ulf` stored as a GitHub secret and supports `packageMode` for UPM packages on Linux runners. Constraint: the package must not be the repository root, so the workflow checks out into a subdirectory. Details in Phase 5 | Phase 5 |
+| 4 | CI environment | **Verified with Unity Personal account activation (2026-10-07).** GameCI `unity-test-runner@v4` uses `UNITY_EMAIL` / `UNITY_PASSWORD` with `GAME_CI_UNITY_LICENSING_METHOD=personal`; manual `.ulf` activation failed validation. It supports `packageMode` for UPM packages on Linux runners. Constraint: the package must not be the repository root, so the workflow checks out into a subdirectory. All three jobs passed on `feature/native-logger`; details and results in Phase 5 | Phase 5 |
 | 5 | "Native" backend | **Pure C#.** "Native logger" means TraceForge itself, written in C#, with no C/C++ plugin and no Unity `Debug.Log` dependency. No P/Invoke layer is planned. `LogEntry` still avoids holding `UnityEngine.Object` references (D6), which keeps a future unmanaged sink possible but is not a goal | All |
 
 ## Project Conventions to Respect

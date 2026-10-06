@@ -97,7 +97,7 @@ Checks before enabling:
 
 - [x] Write `Documentation~/Migration.md`
 - [x] Optional scanner assessed and omitted; the required migration guide is the deliverable for this session
-- [ ] Add the CI workflow using the three user-registered secrets; push `feature/native-logger` and verify all three matrix jobs
+- [x] Add the CI workflow; use the registered account credentials for Personal activation, push `feature/native-logger`, and verify all three matrix jobs
 - [x] Metadata cleanup + `PackageMetaValidationTests` extension
 - [x] Backfill CHANGELOG 0.2.0 and retain Phase 1–4 changes under Unreleased (version-bump deferred)
 - [x] Update `DeferredIssues.md` (issue 6 resolved; add the lazy-formatting item)
@@ -113,7 +113,8 @@ Checks before enabling:
 - Negative control: with expectation environment variable `1` and no response files, the probe test fails; with response files, both Runtime probes are true and the test passes. The workflow's XML verification code passes against both real result sets.
 - Local PlayMode uses the previously established domain-reload workaround; original host settings, the host-only test, and generated response files/metas are restored after verification.
 - Package URLs are canonical; author name/email and version 0.2.0 are unchanged. Historical performance rig reproducibility remains a documented Phase 4 limitation; this session makes no new timing claim.
-- First CI run `35688902916` failed all three jobs before Unity started: `Unknown argument: noCoverageEnabled`. The action/CLI argument mismatch is repaired using the pinned CLI environment options above. Run `35689323607` attempts 1 and 2 failed manual activation with `Missing Signature node`; attempt 3 failed with `TimeStamp validation failed`. Account activation is the next verification run. Release operations below remain for Session 7.
+- First CI run `35688902916` failed all three jobs before Unity started: `Unknown argument: noCoverageEnabled`. The action/CLI argument mismatch is repaired using the pinned CLI environment options above. Run `35689323607` attempts 1 and 2 failed manual activation with `Missing Signature node`; attempt 3 failed with `TimeStamp validation failed`. Account activation passed in [run 37501534515](https://github.com/shinjh0380/trace-forge/actions/runs/37501534515) at `d91473f` on `feature/native-logger` (2026-10-07). Release operations below remain for Session 7.
+- All three CI jobs (6000.0.84f1 default, 6000.3.8f1 default, 6000.3.8f1 stripped) passed EditMode 27/27 and PlayMode 81/81, with zero failures or skips. The stripped PlayMode XML contains `TRACEFORGE_CI_EXPECT_STRIPPED=1 Trace=True Debug=True`; each job's XML verification step passed. The six additional tests in local results are host-only and absent from GameCI's generated host.
 
 ## Completion Criteria
 
