@@ -45,6 +45,8 @@ When an override exists, it completely replaces the global minimum for that cate
   - `RingBufferSink`: lock-based
   - `FileSink`: bounded `Monitor` queue with a single writer thread
 
+While a thread is dispatching an entry, further logs on that same thread are dropped for all sinks, including captured Unity logs. The original entry continues to the remaining sinks even if a sink throws, and the guard is released in `finally`. Other threads dispatch independently. This guard covers sink `Write` callbacks and failure reporting, not `Flush` or configuration callbacks. `IsEnabled` still describes filtering/stripping/sink presence; it does not predict this reentrant drop. Caller argument evaluation and entry/stack creation occur before the dispatch guard.
+
 ## Performance Notes
 
 - `IsEnabled()` is marked `[AggressiveInlining]`; this is an inlining hint to the compiler, not a runtime guarantee.

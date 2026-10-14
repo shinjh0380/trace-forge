@@ -15,6 +15,9 @@ namespace TraceForge
         private static ILogSink[] _sinks = Array.Empty<ILogSink>();
         private static readonly object _sinksLock = new object();
 
+        // Drop same-thread logging from sink callbacks without blocking other producers.
+        [ThreadStatic] private static bool _dispatching;
+
         // int backing field for Interlocked operations on enum
         private static int _globalMinVerbosityInt = (int)Verbosity.Debug;
 
@@ -123,30 +126,40 @@ namespace TraceForge
 
         private static void Dispatch(in LogEntry entry)
         {
+            if (_dispatching)
+                return;
 
             // Interlocked.Exchange guarantees we read the latest reference
             var sinks = Interlocked.CompareExchange(ref _sinks, null, null);
             if (sinks == null || sinks.Length == 0)
                 return;
 
-            foreach (var sink in sinks)
+            _dispatching = true;
+            try
             {
-                try
-                {
-                    sink.Write(in entry);
-                }
-                catch (Exception ex)
+                foreach (var sink in sinks)
                 {
                     try
                     {
-                        Console.Error.WriteLine(
-                            $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                        sink.Write(in entry);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Last-resort reporting must not interrupt dispatch to remaining sinks.
+                        try
+                        {
+                            Console.Error.WriteLine(
+                                $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                        }
+                        catch
+                        {
+                            // Last-resort reporting must not interrupt dispatch to remaining sinks.
+                        }
                     }
                 }
+            }
+            finally
+            {
+                _dispatching = false;
             }
         }
 

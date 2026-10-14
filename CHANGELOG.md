@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The performance contract documents caller-side guards and body-level stripping without claiming general zero-allocation or throughput guarantees.
 
+### Fixed
+- Nested logging from a sink on the same thread is dropped, preventing recursive dispatch while preserving delivery of the original entry and independent threads.
+- Log Viewer context ping uses the supported EntityId API on Unity 6000.3 and newer, retaining the instance-ID API for earlier supported editors.
+
 ## [0.2.0] - 2026-03-07
 
 ### Added

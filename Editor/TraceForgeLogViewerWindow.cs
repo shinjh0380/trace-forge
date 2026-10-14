@@ -193,7 +193,11 @@ namespace TraceForge.Editor
         {
             if (instanceId == 0)
                 return;
+#if UNITY_6000_3_OR_NEWER
+            var context = EditorUtility.EntityIdToObject((EntityId)instanceId);
+#else
             var context = EditorUtility.InstanceIDToObject(instanceId);
+#endif
             if (context != null)
                 EditorGUIUtility.PingObject(context);
         }
