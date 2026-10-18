@@ -24,9 +24,11 @@ The compatibility follow-up keeps minimum package support at 6000.0. The 6000.6.
 
 The runner still uses the same `-Platform`/`-Out` interface and test arguments. It now waits for the Editor process with `WaitForExit()` rather than the entire child-process tree through `Start-Process -Wait`; compiler/import helpers can outlive a successful Editor exit. See the [PowerShell lifecycle distinction](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process?view=powershell-7.5).
 
-Full EditMode 32 passes with clean compilation. The upgraded host's expected complete PlayMode count is 107 (15 additional cases after the original 92); a missing controller script blocks both standard attempts, including a cold-cache run. The [compatibility record](Benchmarks/2026-10-18-unity66-context-compatibility.md) distinguishes standard suites, direct Editor smoke checks and incomplete benchmarks. No Framework code/asmdef workaround was adopted: unsuccessful embedding and reference-removal probes were restored.
+At that compatibility checkpoint, EditMode 32 passed but both standard PlayMode attempts were blocked by a missing controller script. The [compatibility record](Benchmarks/2026-10-18-unity66-context-compatibility.md) retains those failures. The later [path repair](Benchmarks/2026-10-18-playmode-host-repair-and-performance.md) restores full PlayMode 107/107 (15 additional cases after the original 92). No Framework code/asmdef workaround was adopted: unsuccessful embedding and reference-removal probes were restored.
 
 ### Creation procedure
+
+For the nested 6000.6 host, apply the [package-path correction](#nested-host-package-path-correction-60006) below before running tests. The package checkout contains the host, so its local-package path overlaps the host's default Framework cache.
 
 1. Close Unity and preserve the existing host, especially fixture sources/metas, manifest, ProjectSettings and `run-tests.ps1`. Use a new empty project directory for recreation. Create it with the installed editor and a dedicated log:
 
@@ -64,3 +66,40 @@ Require XML `result=Passed`, expected nonzero counts, `failed=0` and `skipped=0`
 For an actual full compiler check, preserve/move the host `Library`/`Temp` and set process-local `BEE_CACHE_DIRECTORY` to a new empty directory before the standard EditMode run. Confirm actual Csc execution for Runtime, Editor and both package test assemblies, no Csc CacheHit, and zero C# warnings/errors. Restore the environment variable afterward; preserving only a fresh local Library does not exclude the global Bee cache.
 
 Restore manifest, defines, ProjectSettings and fixture contents to the **normalized** snapshot after temporary benchmark configuration. Retain raw XML/logs, files and snapshots separately from fixtures.
+
+## Nested-host package-path correction (6000.6)
+
+The 2026-10-18 [repair investigation](Benchmarks/2026-10-18-playmode-host-repair-and-performance.md) reproduced a path alias: adding the parent checkout as a local package changes the Framework controller's logical path from `Packages/com.unity.test-framework/...` to `Packages/com.skrawberries.traceforge/.worktrees/.../Library/PackageCache/...`. Its `MonoScript.GetClass()` becomes null; the runner scene stores an inline script reference that fails across domain reload. Removing only the parent dependency restores the correct mapping in the isolated project.
+
+Keep the host inside `.worktrees/` and the TraceForge dependency pointing at this checkout. Resolve the same installed Test Framework from an **unmodified writable copy outside the checkout**, so its physical path cannot match the parent package. Do not edit Framework code/asmdefs or disable reload. Directly referencing Program Files restored binding but produced directory-watcher write failures; the final host uses `%LOCALAPPDATA%/TraceForge/UnityTestFramework/6000.6.6f1-1.8.0` instead.
+
+Close the host, preserve manifest/lock, and apply this normalization using the runner's `$UnityExe` and absolute `$HostPath`:
+
+```powershell
+$editorDirectory = Split-Path $UnityExe -Parent
+$editorVersion = Split-Path (Split-Path $editorDirectory -Parent) -Leaf
+$frameworkSource = Join-Path $editorDirectory 'Data/Resources/PackageManager/BuiltInPackages/com.unity.test-framework'
+$frameworkVersion = (Get-Content (Join-Path $frameworkSource 'package.json') -Raw | ConvertFrom-Json).version
+$frameworkCopy = Join-Path $env:LOCALAPPDATA "TraceForge/UnityTestFramework/$editorVersion-$frameworkVersion"
+if (-not (Test-Path -LiteralPath $frameworkCopy)) {
+    New-Item -ItemType Directory -Path (Split-Path $frameworkCopy -Parent) -Force | Out-Null
+    Copy-Item -LiteralPath $frameworkSource -Destination $frameworkCopy -Recurse
+}
+if (@(Get-ChildItem -LiteralPath $frameworkCopy -File -Recurse).Count -ne
+    @(Get-ChildItem -LiteralPath $frameworkSource -File -Recurse).Count) {
+    throw 'Framework copy contains missing or extra files'
+}
+Get-ChildItem -LiteralPath $frameworkSource -File -Recurse | ForEach-Object {
+    $relative = [IO.Path]::GetRelativePath($frameworkSource, $_.FullName)
+    if ((Get-FileHash -LiteralPath $_.FullName).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $frameworkCopy $relative)).Hash) {
+        throw "Framework copy differs: $relative"
+    }
+}
+$manifestPath = Join-Path $HostPath 'Packages/manifest.json'
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$manifest.dependencies.'com.unity.test-framework' = 'file:' + $frameworkCopy.Replace('\', '/')
+$manifest | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+```
+
+All 1,176 original Framework files, 85 tracked package source/assets and 56 original host fixture files retained identical hashes during this repair. Only the host manifest/lock dependency source changes permanently. Default domain/scene reload and the standard runner remain unchanged. Record the resolved Framework version and reverify the copy when changing editors; this host-specific correction is not a new runtime package dependency.
