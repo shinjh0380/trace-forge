@@ -14,6 +14,17 @@ namespace TraceForge
     /// </example>
     public static class TF
     {
+#if TRACEFORGE_STRIP_TRACE
+        internal static readonly bool IsTraceStripped = true;
+#else
+        internal static readonly bool IsTraceStripped = false;
+#endif
+#if TRACEFORGE_STRIP_DEBUG
+        internal static readonly bool IsDebugStripped = true;
+#else
+        internal static readonly bool IsDebugStripped = false;
+#endif
+
         // ── Verbosity shortcuts (default category) ────────────────────────
 
         /// <summary>Logs a Trace-level message to the default category.</summary>
@@ -156,6 +167,102 @@ namespace TraceForge
 #endif
         }
 
+        /// <summary>Logs a message with a Unity context object. Call from the main thread.</summary>
+        /// <param name="category">The category.</param><param name="verbosity">The verbosity.</param>
+        /// <param name="message">The message.</param><param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Log(LogCategory category, Verbosity verbosity, string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(verbosity, category, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs a Warning with a Unity context object. Call from the main thread.</summary>
+        /// <param name="message">The message.</param><param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Warning(string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Warning, Categories.Default, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs a Warning to a category with a Unity context object. Call from the main thread.</summary>
+        /// <param name="category">The category.</param><param name="message">The message.</param>
+        /// <param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Warning(LogCategory category, string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Warning, category, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs an Error with a Unity context object. Call from the main thread.</summary>
+        /// <param name="message">The message.</param><param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Error(string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Error, Categories.Default, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs an Error to a category with a Unity context object. Call from the main thread.</summary>
+        /// <param name="category">The category.</param><param name="message">The message.</param>
+        /// <param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Error(LogCategory category, string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Error, category, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs an Error with exception and Unity context. Call from the main thread.</summary>
+        /// <param name="message">The message.</param><param name="exception">The exception.</param>
+        /// <param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Error(string message, Exception exception, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Error, Categories.Default, message, exception, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs a Fatal with a Unity context object. Call from the main thread.</summary>
+        /// <param name="message">The message.</param><param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Fatal(string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Fatal, Categories.Default, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs a Fatal to a category with a Unity context object. Call from the main thread.</summary>
+        /// <param name="category">The category.</param><param name="message">The message.</param>
+        /// <param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Fatal(LogCategory category, string message, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Fatal, category, message, null, ContextId.Capture(context));
+#endif
+        }
+
+        /// <summary>Logs an Error with exception, category, and Unity context. Call from the main thread.</summary>
+        /// <param name="category">The category.</param><param name="message">The message.</param>
+        /// <param name="exception">The exception.</param><param name="context">The Unity context object.</param>
+        [HideInCallstack]
+        public static void Error(LogCategory category, string message, Exception exception, UnityEngine.Object context)
+        {
+#if !TRACEFORGE_DISABLE
+            Logger.Write(Verbosity.Error, category, message, exception, ContextId.Capture(context));
+#endif
+        }
+
         // ── Exception overloads ───────────────────────────────────────────
 
         /// <summary>Logs an Error-level message with an associated exception.</summary>
@@ -190,6 +297,14 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsEnabled(Verbosity verbosity)
         {
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_TRACE
+            if (verbosity == Verbosity.Trace)
+                return false;
+#endif
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_DEBUG
+            if (verbosity == Verbosity.Debug)
+                return false;
+#endif
 #if TRACEFORGE_DISABLE
             return false;
 #else
@@ -203,6 +318,14 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsEnabled(Verbosity verbosity, in LogCategory category)
         {
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_TRACE
+            if (verbosity == Verbosity.Trace)
+                return false;
+#endif
+#if TRACEFORGE_DISABLE || TRACEFORGE_STRIP_DEBUG
+            if (verbosity == Verbosity.Debug)
+                return false;
+#endif
 #if TRACEFORGE_DISABLE
             return false;
 #else
@@ -239,6 +362,7 @@ namespace TraceForge
         {
             Logger.ClearSinks();
             Logger.SetMinVerbosity(Verbosity.Debug);
+            Logger.SetStackTracePolicy(Logger.GetDefaultStackTracePolicy());
             Logger.ClearAllCategoryVerbosities();
         }
     }

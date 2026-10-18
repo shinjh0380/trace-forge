@@ -13,7 +13,8 @@ namespace TraceForge
         void Write(in LogEntry entry);
 
         /// <summary>
-        /// Flushes any buffered entries. Called automatically on application quit.
+        /// Flushes any buffered entries. The bootstrap flushes its owned sinks on application quit.
+        /// The code that registers a user-owned sink is responsible for flushing and disposing it.
         /// </summary>
         void Flush();
     }

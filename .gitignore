@@ -35,3 +35,12 @@ Thumbs.db
 *.mdb
 *.opendb
 *.VC.db
+
+# Development tooling and CI-only response files
+CLAUDE.md.meta
+.agents/
+.codex/
+AGENTS.md
+AGENTS.md.meta
+csc.rsp
+csc.rsp.meta

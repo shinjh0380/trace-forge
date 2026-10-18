@@ -7,21 +7,14 @@ using TraceForge;
 /// </summary>
 public class TraceForgeBasicUsage : MonoBehaviour
 {
-    private RingBufferSink _ringBuffer;
     private FileSink _fileSink;
 
     private void Awake()
     {
-        // Add ring buffer for Log Viewer window (Window > TraceForge > Log Viewer)
-        _ringBuffer = new RingBufferSink(capacity: 256);
-        TF.AddSink(_ringBuffer);
-
-        // Add asynchronous file sink. File formatting and I/O run on its writer thread.
-        _fileSink = new FileSink(Application.persistentDataPath + "/traceforge.log");
+        // Bootstrap provides the Editor ring buffer. Add an extra asynchronous file sink.
+        // Use a separate name so it does not share the bootstrap file handle.
+        _fileSink = new FileSink(Application.persistentDataPath + "/traceforge-sample.log");
         TF.AddSink(_fileSink);
-
-        // Set minimum verbosity (Trace, Debug, Info, Warning, Error, Fatal)
-        TF.SetMinVerbosity(Verbosity.Debug);
 
         TF.Info("TraceForge initialized");
     }
