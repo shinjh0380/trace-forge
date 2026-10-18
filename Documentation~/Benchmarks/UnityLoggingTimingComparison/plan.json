@@ -1,0 +1,42 @@
+{
+  "protocol": "readme-unity-vs-traceforge-timing-v2",
+  "frozenBeforeFirstTimingUtc": "2026-10-18T10:03:24.1924161Z",
+  "sourceCommit": "1ba20e8e5ff5a21a08fe575b38c34e1099d4e4e8",
+  "unity": "6000.6.6f1",
+  "environment": "Windows Editor batchmode, -nographics, no Console window rendering",
+  "modes": [
+    "unity",
+    "traceforge"
+  ],
+  "order": [
+    "unity",
+    "traceforge",
+    "traceforge",
+    "unity",
+    "unity",
+    "traceforge",
+    "traceforge",
+    "unity",
+    "unity",
+    "traceforge"
+  ],
+  "independentProcessesPerMode": 5,
+  "warmupCalls": 1000,
+  "measuredCalls": 100000,
+  "messages": "Identical prebuilt ASCII strings with unique six-digit sequence IDs; no interpolation in timed loops",
+  "unityRoute": "UnityEngine.Debug.Log -> default DebugLogHandler -> per-process native Editor log",
+  "traceforgeRoute": "TF.Info -> Logger -> single FileSink -> separate UTF-8 file; queueCapacity=4096",
+  "unityCapture": false,
+  "stackTraces": "Application LogType.Log=None and Logger StackTracePolicy.None",
+  "filters": "Unity logEnabled=true/filterLogType=Log; TF global minimum=Info, no category overrides, exactly one FileSink",
+  "producerMetric": "Stopwatch ticks around only the 100000 public logging calls on the main thread",
+  "completionMetric": "TF producer+Flush is recorded separately; Unity equivalent is unavailable, not inferred from loop duration",
+  "persistence": "After each process exits, check every warmup and measured sequence exactly once and in order in its actual output file",
+  "allocation": "No allocation recorder, Profiler.enabled=false, enableAllocationCallstacks=false; allocation is NOT measured in this timing-only cohort.",
+  "stopRules": "Stop on nonzero exit, timeout 300s, missing result, compilation diagnostic, disabled/wrong sink or capture/filter state, or missing/duplicate/out-of-order output. Preserve the attempt. No successful run or outlier is discarded.",
+  "analysis": "Publish all five observations per mode and medians; producer median ratio and reduction only. A paired log-ratio t95 interval is descriptive with n=5 and approximate normal/independent-pair assumptions; it is not a new acceptance gate. If it spans parity, do not claim demonstrated superiority.",
+  "limits": "Different output formatting and file paths, no Console GUI, no Player/mobile timing, no fsync guarantee. Default stack settings are not benchmarked.",
+  "existingPolicy": "Historical reproduction FAIL and approved v0.3.0 rig exception, prior direct FileSink 5% gate, and scoped guard cost remain unchanged. No new baseline is adopted.",
+  "reasonForSeparateCohort": "The complete first cohort enabled GC.Alloc observation; Unity produced a Count delta of 200000 versus TF 0. Preserve all original observations and use a separately prefixed, fixed 10-process cohort to avoid presenting recorder-instrumented latency as uninstrumented API timing. This does not prove that instrumentation caused the original difference.",
+  "earlierCohort": "../UnityLoggingComparison/"
+}

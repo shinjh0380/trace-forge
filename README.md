@@ -6,32 +6,18 @@
 
 Asynchronous files, category filters, and an Editor log viewer. **Unity 6000.0+ · .NET Standard 2.1 · MIT.**
 
-## By the numbers
-
-<picture>
-  <source media="(max-width: 640px)" srcset="Documentation~/Media/facts.en.mobile.svg">
-  <img src="Documentation~/Media/facts.en.svg" alt="0 third-party runtime dependencies; 6 verbosity levels; 9 built-in categories; 4,096 default file queue entries.">
-</picture>
-
-[Sources: package metadata and runtime defaults](Documentation~/Media/README.md#sources).
-
-## Measured file output
+## Compared with Unity logging
 
 <picture>
   <source media="(max-width: 640px)" srcset="Documentation~/Media/benchmark.en.mobile.svg">
-  <img src="Documentation~/Media/benchmark.en.svg" alt="Direct FileSink benchmark: median producer time for 100,000 prebuilt entries, 5 independent runs per configuration. Reference 22.7981 ms; candidate C2 17.0726 ms, C3 20.1773 ms, C4 16.8669 ms.">
+  <img src="Documentation~/Media/benchmark.en.svg" alt="Unity Debug.Log versus actual TF.Info→Logger→FileSink. Median caller time for 100,000 messages: Unity 5885.5019ms, TraceForge 719.6172ms. Five runs each, all messages persisted. Windows Editor without Console UI; Profiler/stacks/capture off; one FileSink, default queue 4096.">
 </picture>
 
-Windows Editor **6000.6.6f1** · i7-13700HX · **20/20** runs wrote **100,000 lines each**, with **0 observed GC.Alloc samples** (an event proxy, not a byte-allocation guarantee). Direct `FileSink.Write` only; excludes TF/Logger dispatch and Unity callbacks.
+**100,000 identical messages**, **5 independent runs** per route. Caller time uses **one manually registered FileSink**. The two routes have different file formats and internal work.
 
-Historical ±10% reproducibility: **FAIL**, with an approved v0.3.0 rig exception. No Player/mobile timing claim. [Raw runs, configuration definitions, and limits](Documentation~/Benchmarks/2026-10-18-playmode-host-repair-and-performance.md).
+TraceForge calls + `Flush` median: **761.16ms**. Unity has no equivalent Flush API, so completion speed is not compared. These are not Console UI or Player/mobile measurements.
 
-## Where logs go
-
-<picture>
-  <source media="(max-width: 640px)" srcset="Documentation~/Media/pipeline.en.mobile.svg">
-  <img src="Documentation~/Media/pipeline.en.svg" alt="TF calls and captured Unity messages pass through category and verbosity filters to sinks. RingBufferSink feeds the Editor viewer; FileSink queues entries for a background writer. A full file queue blocks the producer.">
-</picture>
+[Method, every raw result, and scope](Documentation~/Benchmarks/2026-10-18-unity-logging-comparison.md).
 
 ## Quick start
 
@@ -59,6 +45,22 @@ if (TF.IsEnabled(Verbosity.Debug, Categories.Network))
 For files, enable **File Sink** in **Project Settings → TraceForge**. Default output: `Application.persistentDataPath/traceforge.log`. Release Players need an enabled sink. Threaded `FileSink` is unsupported on WebGL.
 
 Use `IsEnabled` **before** interpolation or expensive arguments. Strip symbols remove method bodies; C# still evaluates call arguments. [Stripping and full API](Documentation~/TraceForge.md).
+
+## By the numbers
+
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/facts.en.mobile.svg">
+  <img src="Documentation~/Media/facts.en.svg" alt="0 third-party runtime dependencies; 6 verbosity levels; 9 built-in categories; 4,096 default file queue entries.">
+</picture>
+
+[Sources: package metadata and runtime defaults](Documentation~/Media/README.md#sources).
+
+## Where logs go
+
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/pipeline.en.mobile.svg">
+  <img src="Documentation~/Media/pipeline.en.svg" alt="TF calls and captured Unity messages pass through category and verbosity filters to sinks. RingBufferSink feeds the Editor viewer; FileSink queues entries for a background writer. A full file queue blocks the producer.">
+</picture>
 
 ## Verified configurations
 

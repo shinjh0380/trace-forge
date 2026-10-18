@@ -1,0 +1,22 @@
+{
+  "PlanSha256": "B18BEFC29B845FFA6BC64DC59288FC36EA65FC53DDF13F58587A4B166A916180",
+  "SourceSha256": "0625903F486C018E190B290F291E550B1689D24E10AE1A43AE95FFBCA371E405",
+  "RunnerSha256": "C879D11C8256ED4AB1A1D54D8BE3A4A168D0A5EE9B42315CBC4868FFE75A9620",
+  "VerifierSha256": "2986C4BCC33CA98DF358E4746C29C1EB7E46BD00DC88A0702618F25B50A8A614",
+  "ProductCommit": "1ba20e8e5ff5a21a08fe575b38c34e1099d4e4e8",
+  "CPU": [
+    {
+      "Name": "13th Gen Intel(R) Core(TM) i7-13700HX",
+      "NumberOfCores": 16,
+      "NumberOfLogicalProcessors": 24
+    }
+  ],
+  "OS": {
+    "Caption": "Microsoft Windows 11 Home",
+    "Version": "10.0.26200",
+    "TotalVisibleMemorySize": 33240568
+  },
+  "PowerScheme": "전원 구성표 GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (균형 조정)",
+  "EditorExe": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.6f1\\Editor\\Unity.exe",
+  "StartedUtc": "2026-10-18T09:51:40.7141390Z"
+}

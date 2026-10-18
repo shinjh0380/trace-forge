@@ -1,0 +1,10 @@
+{
+  "measuredMessages": 100000,
+  "warmupMessages": 1000,
+  "uniqueOrderedSequence": true,
+  "outputBytes": 6077432,
+  "outputSha256": "0671e8da5fc979940325eb4e190e0e3ad20b52f4c86c15adf95d101c9c250b44",
+  "nativeLogSha256": "0671e8da5fc979940325eb4e190e0e3ad20b52f4c86c15adf95d101c9c250b44",
+  "compilationDiagnostics": 0,
+  "outputVerifiedAfterProcessExit": true
+}
