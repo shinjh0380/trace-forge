@@ -119,6 +119,8 @@ What developers lose when Debug.Log is removed, and what TraceForge must provide
 
 ## Target Structure
 
+Compatibility follow-up (2026-10-18): the user approved widening D6's `ContextInstanceId` and extended constructor argument from `int` to `ulong`, retaining zero/no-reference semantics and session-local IDs. Minimum Unity stays 6000.0; 6000.6+ uses EntityId's supported 64-bit conversions, while older versions round-trip signed instance IDs internally. Revalidate on the installed 6000.6.6f1 rig against the unchanged `f95dcc2` reference. The producer 5%, allocation/file-count gates and historical failures above remain unchanged; no release actions or automatic new-baseline adoption are authorized. [Compatibility validation](../../Benchmarks/2026-10-18-unity66-context-compatibility.md): clean compile and EditMode pass; full PlayMode and the 20-process performance set remain blocked.
+
 ```text
                  ┌── TraceForgeSettings (SO, Preloaded Asset) ──┐
                  │   MinVerbosity, CategoryOverrides,             │

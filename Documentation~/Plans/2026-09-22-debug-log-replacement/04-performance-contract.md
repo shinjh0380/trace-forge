@@ -59,6 +59,8 @@ The TF-path +5.71–8.07% measured in the guard validation is accepted for that 
 
 ### Original measurement protocol
 
+2026-10-18 compatibility follow-up: after reinstalling Unity 6000.6.6f1, the user requested compatibility fixes and a new same-environment comparison, preserving the gates above. Record the actual resolved Test Framework version, candidate source hashes and measured `LogEntry` size; the newly approved `ulong` context ID must not silently narrow 64 bits. Neither an Editor upgrade nor successful functional tests establish performance PASS. Earlier 6000.3 failures remain in their dated reports. The [current set](../../Benchmarks/2026-10-18-unity66-context-compatibility.md) stopped at 2/20 completed processes with a C3 startup timeout; it does not establish the 5% gate.
+
 - Test host: `.worktrees/native-logger-test-host`, Windows Editor PlayMode, batch mode, 5 independent Unity processes per configuration.
 - 1,000-iteration warm-up, then 100,000 `Write(in entry)` calls with one pre-built `LogEntry`; queue capacity 101,024 so the producer path never saturates.
 - Measure: producer time (to the last `Write` return), completion time (to `Flush()` return), producer-thread `GC.Alloc` count via `ProfilerRecorder` (`CollectOnlyOnCurrentThread`).

@@ -18,6 +18,16 @@ After the user installed **6000.6.6f1**, the runner's `$UnityExe` was updated to
 
 ## Recreate the host
 
+### 6000.6 compatibility normalization
+
+The compatibility follow-up keeps minimum package support at 6000.0. The 6000.6.6f1 host resolves **Test Framework 1.8.0 builtin** (Unity automatically updates the old 1.6.0 request). The new normalized fixture archive is `.unity66-fix-20261018/Assets.final-normalized/`: it preserves metas and adds only version-specific reflection/context lookup APIs. Keep the original `.approval-20261018/` archive for the prior 6000.3 host; it contains older context API calls.
+
+The runner still uses the same `-Platform`/`-Out` interface and test arguments. It now waits for the Editor process with `WaitForExit()` rather than the entire child-process tree through `Start-Process -Wait`; compiler/import helpers can outlive a successful Editor exit. See the [PowerShell lifecycle distinction](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process?view=powershell-7.5).
+
+Full EditMode 32 passes with clean compilation. The upgraded host's expected complete PlayMode count is 107 (15 additional cases after the original 92); a missing controller script blocks both standard attempts, including a cold-cache run. The [compatibility record](Benchmarks/2026-10-18-unity66-context-compatibility.md) distinguishes standard suites, direct Editor smoke checks and incomplete benchmarks. No Framework code/asmdef workaround was adopted: unsuccessful embedding and reference-removal probes were restored.
+
+### Creation procedure
+
 1. Close Unity and preserve the existing host, especially fixture sources/metas, manifest, ProjectSettings and `run-tests.ps1`. Use a new empty project directory for recreation. Create it with the installed editor and a dedicated log:
 
    ```powershell
@@ -36,7 +46,7 @@ After the user installed **6000.6.6f1**, the runner's `$UnityExe` was updated to
    }
    ```
 
-3. Restore the prior host fixture sources and their `.meta` files from `Assets.normalized/`, plus the saved `run-tests.ps1`. These fixtures include the Basic Usage, lifecycle and third-party-capture verification. A fresh clone without this local fixture archive has a different test count; do not claim the full host's 32/92 counts for it.
+3. For 6000.6, accept the resolved Test Framework 1.8.0 builtin and restore fixture sources/metas from `.unity66-fix-20261018/Assets.final-normalized/`, plus the current saved `run-tests.ps1`. For the older 6000.3 host, use its `Assets.normalized/` archive and 1.6.0. These fixtures include Basic Usage, lifecycle and third-party-capture verification. A fresh clone without this local fixture archive has a different test count; do not claim the full host's counts for it.
 4. Check the host PlayMode asmdef above. If restoring an older fixture archive, back up that file and remove **only** `UnityEditor.TestRunner` from its `references` array. Retain all other references, assembly settings and tests. The normalized archive already contains this correction. Use normalized snapshots for subsequent benchmark restoration; the older `.guard-fix-20261014/restore-host.ps1` restores the pre-correction file.
 5. Keep default domain and scene reload (`m_EnterPlayModeOptionsEnabled: 0`, `m_EnterPlayModeOptions: 0`) and empty Standalone scripting defines. Set `$UnityExe` at the top of the runner to the installed editor. Use `-logFile` on every Unity invocation.
 
