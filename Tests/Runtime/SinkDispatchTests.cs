@@ -96,6 +96,19 @@ namespace TraceForge.Tests
             Assert.AreEqual(1, sink.Count);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void EmptyMessage_IsDispatchedUnchanged(bool captured)
+        {
+            var sink = new TestSink();
+            TF.AddSink(sink);
+
+            WriteVia(captured, string.Empty);
+
+            Assert.AreEqual(1, sink.Count);
+            Assert.AreEqual(string.Empty, sink.Entries[0].Message);
+        }
+
         [Test]
         public void RemoveSink_StopsDispatch()
         {
