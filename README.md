@@ -1,20 +1,29 @@
 # TraceForge
 
-A lightweight, zero-allocation logging system for Unity 6 with no third-party dependencies.
+A logging package for Unity 6 with no third-party dependencies.
 
 ## Requirements
 
-- Unity 6.x (6000.0 or later)
+- Minimum Unity version: **6000.0**
+- Validation versions: **6000.3.8f1** (prior validation) and **6000.6.6f1** (current compatibility verification)
 - API Compatibility Level: **.NET Standard 2.1**
+
+Context IDs use `ulong` to preserve Unity 6000.6's 64-bit EntityId. Unity 6000.0/6000.3 use an internal conversion that also preserves negative instance IDs. `LogEntry.ContextInstanceId` and its extended constructor changed from `int` to `ulong`; the five-argument constructor is unchanged. IDs identify objects only within the current Unity session and must not be persisted or exchanged between sessions.
+
+The 6000.6.6f1 host passes clean compilation and full EditMode/PlayMode after a test-host path correction. See the [verification record](Documentation~/Benchmarks/2026-10-18-playmode-host-repair-and-performance.md) for scoped performance results and limitations.
 
 ## Features
 
 - **Sink-based** — route logs to an asynchronous file, ring buffer, or your own sink
 - **Asynchronous file output** — formatting and file I/O run on a dedicated background thread
-- **Zero-allocation** on disabled log paths — verbosity check before any string creation
+- **Disabled-path filtering** — verbosity, category, and sink checks happen before TraceForge creates a `LogEntry`; caller-created arguments are evaluated before any method call
 - **Category filtering** — per-category verbosity overrides
-- **Compile-time stripping** — remove Trace/Debug levels from release builds
-- **Thread-safe** — lock-free hot path with copy-on-write sink array
+- **Unity log capture** — route engine and third-party messages through the `Unity` category
+- **Context and stacks** — retain Unity context IDs and configurable stack traces without retaining objects
+- **Compile-time stripping** — remove Trace/Debug method bodies while keeping call-site C# evaluation rules explicit
+- **Thread-safe registration** — sink registration uses a copy-on-write array, while each sink documents its own threading model
+
+Unity capture and configured stack policies start in Play Mode/Players; the Edit Mode bootstrap currently supplies a ring buffer and filters only.
 
 ## Installation
 
@@ -23,16 +32,29 @@ Add via Unity Package Manager using Git URL:
 https://github.com/shinjh0380/trace-forge.git
 ```
 
+For a step-by-step migration from Unity's `Debug.Log` family, see the
+[migration guide](Documentation~/Migration.md).
+
 ## Quick Start
+
+TraceForge configures its default sinks from **Project Settings > TraceForge**. In the Editor and Development builds, a ring buffer is available automatically, so logging works without initialization code:
+
+```csharp
+TF.Info("Game started");
+```
+
+The settings asset is stored at `ProjectSettings/TraceForgeSettings.asset`. Enable the file sink there when a player should write to `Application.persistentDataPath`.
+
+Add a sink in code only when you need an additional destination:
 
 ```csharp
 using System.IO;
 using TraceForge;
 using UnityEngine;
 
-// Initialize sinks (call once on startup)
+// Optional additional sinks
 var fileSink = new FileSink(
-    Path.Combine(Application.persistentDataPath, "traceforge.log"));
+    Path.Combine(Application.persistentDataPath, "traceforge-extra.log"));
 var ringBuffer = new RingBufferSink(capacity: 512);
 
 TF.AddSink(fileSink);
@@ -43,7 +65,7 @@ TF.Info("Game started");
 TF.Warning(Categories.Network, "Connection slow");
 TF.Error("Something went wrong");
 
-// Remove and dispose the owned file sink during shutdown.
+// Remove and dispose sinks created by your code during shutdown.
 TF.RemoveSink(fileSink);
 fileSink.Dispose();
 ```
@@ -64,11 +86,18 @@ fileSink.Dispose();
 | `TF.RemoveSink(ILogSink)` | Unregister a sink |
 | `TF.Reset()` | Reset to default state (useful in tests) |
 
-Same pattern applies to: `Trace`, `Debug`, `Warning`, `Error`, `Fatal`.
+The same no-context pattern applies to `Trace`, `Debug`, `Warning`, `Error`, and `Fatal`. Context overloads are available only for `Log`, `Warning`, `Error`, and `Fatal`; they record the object's instance ID and must be called from the main thread.
+
+```csharp
+TF.Error("Could not load", gameObject);
+TF.Error("Could not load", exception, gameObject);
+```
+
+If a call with an exception and a context passes `null`, cast it to the intended type because `Error("message", null)` is ambiguous; the one-argument `Error("message")` remains unambiguous.
 
 ### Predefined Categories
 
-`Categories.Default`, `Categories.Gameplay`, `Categories.Network`, `Categories.UI`, `Categories.Audio`, `Categories.Physics`, `Categories.AI`, `Categories.Performance`
+`Categories.Default`, `Categories.Gameplay`, `Categories.Network`, `Categories.UI`, `Categories.Audio`, `Categories.Physics`, `Categories.AI`, `Categories.Performance`, `Categories.Unity`
 
 ### Custom Categories
 
@@ -123,13 +152,27 @@ public class MySink : ILogSink
 
 ## Compile-Time Stripping
 
-Add to your `asmdef` or scripting define symbols:
+Set these as scripting define symbols for the Unity build so they are applied when the package Runtime assembly is compiled:
 
 | Symbol | Effect |
 |--------|--------|
-| `TRACEFORGE_STRIP_TRACE` | Removes all Trace() calls |
-| `TRACEFORGE_STRIP_DEBUG` | Removes all Debug() calls |
-| `TRACEFORGE_DISABLE` | Removes all logging |
+| `TRACEFORGE_STRIP_TRACE` | Preprocessor removes the `TF.Trace` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Trace)` returns `false`. |
+| `TRACEFORGE_STRIP_DEBUG` | Preprocessor removes the `TF.Debug` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Debug)` returns `false`. |
+| `TRACEFORGE_DISABLE` | Preprocessor removes TF logging method bodies and `TF.IsEnabled` returns `false` for every verbosity. Call arguments still follow normal C# evaluation rules. |
+
+For interpolated or otherwise expensive messages, guard the call before constructing the message. The category overload preserves category-specific filtering:
+
+```csharp
+if (TF.IsEnabled(Verbosity.Debug))
+    TF.Debug($"Player {playerId} score {score}");
+
+if (TF.IsEnabled(Verbosity.Trace, Categories.Network))
+    TF.Trace(Categories.Network, BuildPacketSummary());
+```
+
+The guard avoids the work only when its condition is false. It is recommended for disabled verbosity, filtered categories, and configurations with no registered sinks.
+
+Both `IsEnabled` overloads return `false` when no sinks are registered, and the matching overload returns `false` when its Trace or Debug strip symbol is active. Throughput and allocation measurements are reported separately in the [Phase 4 benchmark record](Documentation~/Benchmarks/2026-09-22-native-logger-overhead.md).
 
 ## Editor Tools
 

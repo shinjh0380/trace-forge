@@ -24,6 +24,37 @@ namespace TraceForge.Tests
             Assert.AreEqual("message", entry.Message);
             Assert.AreEqual(ex, entry.Exception);
             Assert.AreEqual(ticks, entry.TimestampTicks);
+            Assert.AreEqual(0, entry.ContextInstanceId);
+            Assert.IsNull(entry.StackTrace);
+        }
+
+        [Test]
+        public void LogEntry_ExtendedConstructor_StoresContextAndStackTrace()
+        {
+            var entry = new LogEntry(
+                Verbosity.Error, Categories.Network, "message", null, 17, 0x1234567887654321UL, "at Caller.Method()");
+
+            Assert.AreEqual(0x1234567887654321UL, entry.ContextInstanceId);
+            Assert.AreEqual("at Caller.Method()", entry.StackTrace);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(-1)]
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void LegacyContextId_RoundTripsSignedInstanceId(int instanceId)
+        {
+            ulong encoded = ContextId.FromLegacyInstanceId(instanceId);
+
+            Assert.AreEqual(instanceId, ContextId.ToLegacyInstanceId(encoded));
+            Assert.AreEqual(unchecked((uint)instanceId), encoded);
+        }
+
+        [Test]
+        public void LegacyContextLookup_RejectsIdsWithUpperBits()
+        {
+            Assert.AreEqual(0, ContextId.ToLegacyInstanceId(0x1234567887654321UL));
         }
 
         [Test]
@@ -72,6 +103,7 @@ namespace TraceForge.Tests
             Assert.AreEqual("Physics", Categories.Physics.Name);
             Assert.AreEqual("AI", Categories.AI.Name);
             Assert.AreEqual("Performance", Categories.Performance.Name);
+            Assert.AreEqual("Unity", Categories.Unity.Name);
         }
 
         [Test]

@@ -283,6 +283,16 @@ namespace TraceForge
                         _writer.Write("Exception: ");
                         _writer.WriteLine(entry.Exception);
                     }
+
+                    if (entry.StackTrace != null)
+                    {
+                        string[] lines = entry.StackTrace.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string line in lines)
+                        {
+                            _writer.Write("    ");
+                            _writer.WriteLine(line);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {

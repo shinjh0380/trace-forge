@@ -29,14 +29,27 @@ namespace TraceForge.Tests
         [Test]
         public void CategoryVerbosity_CanBeSetHigherThanGlobal()
         {
-            TF.SetMinVerbosity(Verbosity.Trace);
+            TF.SetMinVerbosity(Verbosity.Info);
             TF.SetCategoryVerbosity(Categories.Network, Verbosity.Error);
 
-            TF.Debug(Categories.Network, "filtered debug");
+            TF.Info(Categories.Network, "filtered info");
             TF.Error(Categories.Network, "allowed error");
 
             Assert.AreEqual(1, _sink.Count);
             Assert.AreEqual(Verbosity.Error, _sink.Entries[0].Verbosity);
+        }
+
+        [Test]
+        public void CategoryVerbosity_CanBeSetLowerThanGlobal()
+        {
+            TF.SetMinVerbosity(Verbosity.Info);
+            TF.SetCategoryVerbosity(Categories.Network, Verbosity.Trace);
+
+            TF.Trace(Categories.Network, "allowed trace");
+
+            Assert.AreEqual(TF.IsTraceStripped ? 0 : 1, _sink.Count);
+            if (!TF.IsTraceStripped)
+                Assert.AreEqual(Verbosity.Trace, _sink.Entries[0].Verbosity);
         }
 
         [Test]
@@ -51,10 +64,13 @@ namespace TraceForge.Tests
         [Test]
         public void ClearCategoryVerbosity_RestoresGlobalFilter()
         {
-            TF.SetCategoryVerbosity(Categories.Network, Verbosity.Error);
+            TF.SetMinVerbosity(Verbosity.Info);
+            TF.SetCategoryVerbosity(Categories.Network, Verbosity.Trace);
+            Assert.AreEqual(!TF.IsTraceStripped, TF.IsEnabled(Verbosity.Trace, Categories.Network));
             TF.ClearCategoryVerbosity(Categories.Network);
 
-            TF.Debug(Categories.Network, "now visible");
+            Assert.IsFalse(TF.IsEnabled(Verbosity.Trace, Categories.Network));
+            TF.Info(Categories.Network, "now visible");
             Assert.AreEqual(1, _sink.Count);
         }
 
@@ -64,6 +80,24 @@ namespace TraceForge.Tests
             TF.SetCategoryVerbosity(Categories.AI, Verbosity.Fatal);
             Assert.IsFalse(TF.IsEnabled(Verbosity.Error, Categories.AI));
             Assert.IsTrue(TF.IsEnabled(Verbosity.Fatal, Categories.AI));
+        }
+
+        [Test]
+        public void IsEnabled_WithCategory_ReturnsFalse_WhenNoSinksAreRegistered()
+        {
+            TF.ClearSinks();
+
+            Assert.IsFalse(TF.IsEnabled(Verbosity.Debug, Categories.AI));
+            Assert.IsFalse(TF.IsEnabled(Verbosity.Fatal, Categories.AI));
+        }
+
+        [Test]
+        public void IsEnabled_WithCategory_TraceAndDebug_MatchStripProbes()
+        {
+            TF.SetMinVerbosity(Verbosity.Trace);
+
+            Assert.AreEqual(!TF.IsTraceStripped, TF.IsEnabled(Verbosity.Trace, Categories.AI));
+            Assert.AreEqual(!TF.IsDebugStripped, TF.IsEnabled(Verbosity.Debug, Categories.AI));
         }
 
         [Test]

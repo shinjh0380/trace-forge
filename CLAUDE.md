@@ -1,6 +1,6 @@
 # TraceForge
 
-Unity 6.3 LTS UPM 경량 로깅 패키지.
+Unity 6 UPM 경량 로깅 패키지. 최소 6000.0을 유지하며 6000.6의 64비트 context ID API를 지원한다.
 
 ## 아키텍처
 

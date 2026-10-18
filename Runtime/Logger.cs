@@ -15,8 +15,16 @@ namespace TraceForge
         private static ILogSink[] _sinks = Array.Empty<ILogSink>();
         private static readonly object _sinksLock = new object();
 
+        // Drop same-thread logging from sink callbacks without blocking other producers.
+        [ThreadStatic] private static bool _dispatching;
+
         // int backing field for Interlocked operations on enum
         private static int _globalMinVerbosityInt = (int)Verbosity.Debug;
+
+        private static readonly StackTracePolicy DefaultStackTracePolicy = UnityEngine.Debug.isDebugBuild
+            ? StackTracePolicy.ErrorAndAbove
+            : StackTracePolicy.None;
+        private static int _stackTracePolicyInt = (int)DefaultStackTracePolicy;
 
         // Copy-on-write dictionary; reference itself is volatile for lock-free reads
         private static volatile Dictionary<string, Verbosity> _categoryVerbosities
@@ -26,17 +34,33 @@ namespace TraceForge
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
+            Bootstrap.Shutdown();
+
+            ILogSink[] sinks;
             lock (_sinksLock)
             {
-                var sinks = _sinks;
-                foreach (var sink in sinks)
-                    try { sink.Flush(); } catch { /* ignore */ }
-                Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                // Snapshot under the writer lock, but invoke user sink callbacks outside it.
+                sinks = _sinks;
             }
+
+            foreach (var sink in sinks)
+                try { sink.Flush(); } catch { /* ignore */ }
+
+            bool hadRingBuffers;
+            lock (_sinksLock)
+            {
+                // Logger is the single writer: clear both snapshots together after callbacks return.
+                hadRingBuffers = SinkRegistry.RingBuffers.Length > 0;
+                Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                SinkRegistry.Clear();
+            }
+            if (hadRingBuffers)
+                SinkRegistry.NotifyChanged();
 
             lock (_filterLock)
             {
                 Interlocked.Exchange(ref _globalMinVerbosityInt, (int)Verbosity.Debug);
+                Interlocked.Exchange(ref _stackTracePolicyInt, (int)DefaultStackTracePolicy);
                 _categoryVerbosities = new Dictionary<string, Verbosity>(StringComparer.Ordinal);
             }
         }
@@ -44,13 +68,15 @@ namespace TraceForge
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsEnabled(Verbosity verbosity)
         {
+            if (_sinks.Length == 0)
+                return false;
             return (int)verbosity >= _globalMinVerbosityInt;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsEnabled(Verbosity verbosity, in LogCategory category)
         {
-            if ((int)verbosity < _globalMinVerbosityInt)
+            if (_sinks.Length == 0)
                 return false;
 
             // Lock-free read of the dictionary reference (volatile)
@@ -58,7 +84,7 @@ namespace TraceForge
             if (dict.Count > 0 && dict.TryGetValue(category.Name ?? string.Empty, out Verbosity categoryMin))
                 return (int)verbosity >= (int)categoryMin;
 
-            return true;
+            return (int)verbosity >= _globalMinVerbosityInt;
         }
 
         [HideInCallstack]
@@ -67,37 +93,121 @@ namespace TraceForge
             if (!IsEnabled(verbosity, category))
                 return;
 
-            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks);
+            string stackTrace = CaptureStackTrace(verbosity);
+            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks, 0, stackTrace);
+            Dispatch(in entry);
+        }
+
+        [HideInCallstack]
+        internal static void Write(Verbosity verbosity, in LogCategory category, string message, Exception exception, ulong contextInstanceId)
+        {
+            if (!IsEnabled(verbosity, category))
+                return;
+
+            string stackTrace = CaptureStackTrace(verbosity);
+            var entry = new LogEntry(verbosity, category, message, exception, DateTime.UtcNow.Ticks, contextInstanceId, stackTrace);
+            Dispatch(in entry);
+        }
+
+        internal static void WriteCaptured(
+            Verbosity verbosity,
+            in LogCategory category,
+            string message,
+            string stackTrace)
+        {
+            if (!IsEnabled(verbosity, category))
+                return;
+
+            var entry = new LogEntry(verbosity, category, message, null, DateTime.UtcNow.Ticks, 0, stackTrace);
+            Dispatch(in entry);
+        }
+
+        private static void Dispatch(in LogEntry entry)
+        {
+            if (_dispatching)
+                return;
 
             // Interlocked.Exchange guarantees we read the latest reference
             var sinks = Interlocked.CompareExchange(ref _sinks, null, null);
             if (sinks == null || sinks.Length == 0)
                 return;
 
-            foreach (var sink in sinks)
+            _dispatching = true;
+            try
             {
-                try
-                {
-                    sink.Write(in entry);
-                }
-                catch (Exception ex)
+                foreach (var sink in sinks)
                 {
                     try
                     {
-                        Console.Error.WriteLine(
-                            $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                        sink.Write(in entry);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Last-resort reporting must not interrupt dispatch to remaining sinks.
+                        try
+                        {
+                            Console.Error.WriteLine(
+                                $"[TraceForge] Sink '{sink.GetType().Name}' threw an exception: {ex}");
+                        }
+                        catch
+                        {
+                            // Last-resort reporting must not interrupt dispatch to remaining sinks.
+                        }
                     }
                 }
+            }
+            finally
+            {
+                _dispatching = false;
             }
         }
 
         internal static void SetMinVerbosity(Verbosity verbosity)
         {
             Interlocked.Exchange(ref _globalMinVerbosityInt, (int)verbosity);
+        }
+
+        internal static void SetStackTracePolicy(StackTracePolicy policy)
+        {
+            Interlocked.Exchange(ref _stackTracePolicyInt, (int)policy);
+        }
+
+        internal static StackTracePolicy GetStackTracePolicy()
+        {
+            return (StackTracePolicy)Volatile.Read(ref _stackTracePolicyInt);
+        }
+
+        internal static StackTracePolicy GetDefaultStackTracePolicy()
+        {
+            return DefaultStackTracePolicy;
+        }
+
+        private static string CaptureStackTrace(Verbosity verbosity)
+        {
+            StackTracePolicy policy = (StackTracePolicy)Volatile.Read(ref _stackTracePolicyInt);
+            if (policy == StackTracePolicy.None ||
+                (policy == StackTracePolicy.ErrorAndAbove && (int)verbosity < (int)Verbosity.Error))
+                return null;
+
+            string stackTrace = Environment.StackTrace;
+            string[] lines = stackTrace.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            int firstFrame = 0;
+            while (firstFrame < lines.Length && IsInternalStackFrame(lines[firstFrame]))
+                firstFrame++;
+
+            if (firstFrame == 0)
+                return stackTrace;
+            if (firstFrame == lines.Length)
+                return string.Empty;
+
+            return string.Join(Environment.NewLine, lines, firstFrame, lines.Length - firstFrame);
+        }
+
+        private static bool IsInternalStackFrame(string line)
+        {
+            string trimmed = line.TrimStart();
+            return trimmed.StartsWith("at System.Environment", StringComparison.Ordinal) ||
+                trimmed.StartsWith("at TraceForge.Logger.", StringComparison.Ordinal) ||
+                trimmed.StartsWith("at TraceForge.TF.", StringComparison.Ordinal);
         }
 
         internal static void SetCategoryVerbosity(in LogCategory category, Verbosity verbosity)
@@ -141,12 +251,17 @@ namespace TraceForge
                 Array.Copy(current, next, current.Length);
                 next[current.Length] = sink;
                 Interlocked.Exchange(ref _sinks, next);
+                SinkRegistry.Register(sink);
             }
+            if (sink is RingBufferSink)
+                SinkRegistry.NotifyChanged();
         }
 
         internal static bool RemoveSink(ILogSink sink)
         {
             if (sink == null) return false;
+            bool registryChanged = false;
+            bool removed;
             lock (_sinksLock)
             {
                 var current = _sinks;
@@ -156,16 +271,29 @@ namespace TraceForge
                 Array.Copy(current, 0, next, 0, idx);
                 Array.Copy(current, idx + 1, next, idx, current.Length - idx - 1);
                 Interlocked.Exchange(ref _sinks, next);
-                return true;
+                if (Array.IndexOf(next, sink) < 0)
+                {
+                    SinkRegistry.Unregister(sink);
+                    registryChanged = sink is RingBufferSink;
+                }
+                removed = true;
             }
+            if (registryChanged)
+                SinkRegistry.NotifyChanged();
+            return removed;
         }
 
         internal static void ClearSinks()
         {
+            bool hadRingBuffers;
             lock (_sinksLock)
             {
+                hadRingBuffers = SinkRegistry.RingBuffers.Length > 0;
                 Interlocked.Exchange(ref _sinks, Array.Empty<ILogSink>());
+                SinkRegistry.Clear();
             }
+            if (hadRingBuffers)
+                SinkRegistry.NotifyChanged();
         }
 
         internal static Verbosity GetMinVerbosity() => (Verbosity)_globalMinVerbosityInt;
