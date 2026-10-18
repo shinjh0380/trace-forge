@@ -1,9 +1,11 @@
 # TraceForge Debug.Log Replacement — Orchestration
 
-- Status: Draft (awaiting user review)
+- Status: Completed 2026-10-18 (v0.3.0)
 - Date: 2026-09-22
 - Baseline commits: `main` `3baeb05`, `dev` `de3fafc`, `feature/async-file-sink` `f95dcc2`
 - Prior documents: `Designs/2026-07-22-async-file-logging-design.md`, `DeferredIssues.md`
+
+Release acceptance: [v0.3.0 record](../../Releases/0.3.0.md). Published main/tag point to `12c1b06`; completion documentation is committed only on dev. Historical performance failures and the explicitly scoped Windows Editor approval remain unchanged.
 
 > **For agentic workers:** This file is the map. Read it fully before opening any phase file. Each phase file is self-contained for execution but relies on the decisions (D1–D10) and the gap table (G1–G10) defined here. Execute phases strictly in order; do not start a phase until the previous phase's completion criteria are met on `dev`.
 

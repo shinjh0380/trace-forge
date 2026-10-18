@@ -99,10 +99,11 @@ and release behavior.
 
 ## 6. 릴리스 메타데이터 불일치
 
-**메타데이터 해결됨 (Phase 5)** — package URL과 README 설치 경로를
-`shinjh0380/trace-forge`로 통일하고, 최소 `6000.0`과 테스트 버전 `6000.3`을
-구분했다. `0.2.0` 변경 이력을 보완하고 URL·버전 회귀 테스트를 추가했다.
-CI 실행 결과는 Phase 5 계획에 기록하며, 새 릴리스 버전과 tag 확정은 Session 7에 남긴다.
+**해결됨 (`27e47b8`, release merge `12c1b06`, `v0.3.0`)** — package URL과
+README 설치 경로를 `shinjh0380/trace-forge`로 통일하고 최소 `6000.0`을 유지했다.
+`0.2.0` 변경 이력을 보완하고 URL·버전 회귀 테스트를 추가했으며, package/CHANGELOG/설치 URL을
+`0.3.0`으로 확정했다. dev CI 세 matrix와 새 프로젝트의 Git-tag 설치·zero-setup 검증이 통과했다.
+자세한 근거와 성능 승인 범위는 [릴리스 기록](Releases/0.3.0.md)에 남긴다.
 
 ### 해결 전 상태
 

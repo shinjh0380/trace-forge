@@ -102,10 +102,16 @@ Checks before enabling:
 - [x] Backfill CHANGELOG 0.2.0 and retain Phase 1–4 changes under Unreleased (version-bump deferred)
 - [x] Update `DeferredIssues.md` (issue 6 resolved; add the lazy-formatting item)
 - [x] Compare both audit/release checklists item by item and record results in the commit body
-- [ ] Run `traceforge-release-check` for the release (Session 7)
-- [ ] Run `traceforge-version-bump` to 0.3.0
-- [ ] Run `traceforge-release-merge` (`dev → main`); tag `v0.3.0`
-- [ ] Install `main` via Git URL into a fresh Unity 6000.3 project and repeat the Phase 2 completion check (zero-setup `TF.Info` → Viewer) as the final acceptance test
+- [x] Run `traceforge-release-check` for the release (Session 7)
+- [x] Run `traceforge-version-bump` to 0.3.0
+- [x] Run `traceforge-release-merge` (`dev → main`); tag `v0.3.0`
+- [x] Install `v0.3.0` via Git URL into a fresh Unity project and repeat the zero-setup `TF.Info` → RingBuffer → Viewer acceptance test. Use the approved installed editor, 6000.6.6f1, superseding the original 6000.3 host request
+
+## Release completion (2026-10-18)
+
+Released `v0.3.0` at main `12c1b06`, with dev release commit `27e47b8`. The [release record](../../Releases/0.3.0.md) preserves the full checklist and raw-evidence references. Local default-reload suites passed Edit32/32 and Play109/109. [Dev CI](https://github.com/shinjh0380/trace-forge/actions/runs/39112593023) passed all three matrix jobs, each Edit28/28 and Play107/107, with no failed/skipped tests and the stripped Runtime probe marker present.
+
+Fresh Git-URL install on Unity6000.6.6f1 resolved exactly `12c1b06`, compiled with zero C# diagnostics, and passed the single host-only PlayMode check without settings or manual sink/bootstrap initialization. That check verifies both default RingBuffer delivery and the Viewer snapshot. Its first harness compilation failed on an ambiguous `PackageInfo` type name; only that name was qualified before one successful retry, with both records retained. Product code and assertions were unchanged. Historical benchmark failures and the limited Windows Editor performance approval are preserved. These completion edits remain dev-only; the published main/tag are not advanced for them.
 
 ## Session 6 validation
 
