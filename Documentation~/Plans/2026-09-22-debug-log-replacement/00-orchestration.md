@@ -109,6 +109,14 @@ What developers lose when Debug.Log is removed, and what TraceForge must provide
 | D9 | Sink ownership | Sinks created by the bootstrap are disposed by the bootstrap. Sinks added by the user via `AddSink` are the user's responsibility. `TF.Reset()` does not dispose (existing contract kept) | Consistent with the ownership principle in the existing design doc |
 | D10 | `TF.Reset()` vs `Logger.Reset()` | `Logger.Reset` (domain reload) also cleans up bootstrap-owned sinks; `Logger` knows the bootstrap's registration list | Prevents FileSink handle leaks on repeated Play Mode entry |
 
+## v0.3.0 Windows Editor performance decision (approved 2026-10-18)
+
+- Historical ±10% reproduction **FAIL** records remain unchanged. For this v0.3.0 release only, on the designated Windows Editor rig (Unity 6000.3.8f1, UTF 1.6.0, Windows 11 build 26200, i7-13700HX), historical reproduction is no longer a mandatory release gate. Replace that gate with a same-environment comparison of `f95dcc2` and the current candidate; identify the exact candidate and environment in the new validation record.
+- Keep the direct FileSink producer regression limit **≤5%**, current-thread GC sample proxy 0, and actual 100,000 persisted lines. Completion remains a separate metric. Environmental uncertainty that prevents judging 5% is **insufficient evidence**, not PASS; do not repeat until favorable results appear.
+- Accept the observed TF-path median +5.71–8.07% as the cost of this recursion-safety fix only. It is neither a future regression allowance nor a performance guarantee for other environments.
+- The proposal's 3%/2% stability conditions and 2-day/3-session schedule are **not adopted**. See [the policy decision](../../Benchmarks/2026-10-14-baseline-adoption-proposal.md).
+- This decision alone is **not** performance PASS or release approval. Reassess performance after standard-host tests, raw measurements and independent review; only then rerun release-check. Version changes, dev/main merges, tags, pushes and fresh-install work remain outside this session.
+
 ## Target Structure
 
 ```text

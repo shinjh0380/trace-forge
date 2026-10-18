@@ -51,11 +51,19 @@ Recommended: option 2 for the default test run plus the CI-generated response-fi
 
 ## Benchmark Protocol (same as 2026-07-22)
 
+### Approved gate application for v0.3.0 (2026-10-18)
+
+For the designated Windows Editor rig (Unity 6000.3.8f1/UTF 1.6.0, Windows 11 build 26200/i7-13700HX), the user approved replacing mandatory historical ±10% reproduction with a same-environment comparison of `f95dcc2` and the identified current candidate. Historical FAIL reports below and in the benchmark archive remain unchanged. The direct FileSink producer ≤5% regression limit, allocation sample proxy 0 and actual 100,000-line validation remain mandatory; completion has no producer-style 5% gate. If environmental variation prevents a defensible 5% comparison, report insufficient evidence and preserve all results rather than rerun for favorable numbers.
+
+The TF-path +5.71–8.07% measured in the guard validation is accepted for that recursion-safety correction only. It does not change future regression allowances or establish other-platform guarantees. The baseline proposal's 3%/2%/2-day/3-session rules are not adopted. This policy is not a performance PASS or release approval; a new measured record and independent review are required. See [the scoped policy decision](../../Benchmarks/2026-10-14-baseline-adoption-proposal.md) and the map's approved decision.
+
+### Original measurement protocol
+
 - Test host: `.worktrees/native-logger-test-host`, Windows Editor PlayMode, batch mode, 5 independent Unity processes per configuration.
 - 1,000-iteration warm-up, then 100,000 `Write(in entry)` calls with one pre-built `LogEntry`; queue capacity 101,024 so the producer path never saturates.
 - Measure: producer time (to the last `Write` return), completion time (to `Flush()` return), producer-thread `GC.Alloc` count via `ProfilerRecorder` (`CollectOnlyOnCurrentThread`).
 - Configurations:
-  1. Phase 0 baseline commit (`f95dcc2`) — reproduce the 2026-07-22 numbers to validate the rig
+  1. Phase 0 baseline commit (`f95dcc2`) — same-rig reference for the approved v0.3.0 comparison; the original historical reproduction attempt and its FAIL remain in the execution record
   2. Post-Phase-3 `feature/native-logger` with the Phase 4 IsEnabled changes, `StackTracePolicy.None`, capture off
   3. Same checkout, `StackTracePolicy.None`, capture on (subscription active; no Unity message emitted in the timed region)
   4. Same checkout, `StackTracePolicy.ErrorAndAbove`, Info-level prebuilt entries (the direct sink call bypasses the policy check)
