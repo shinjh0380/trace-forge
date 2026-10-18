@@ -29,7 +29,7 @@ Unity capture and configured stack policies start in Play Mode/Players; the Edit
 
 Add via Unity Package Manager using Git URL:
 ```
-https://github.com/shinjh0380/trace-forge.git
+https://github.com/shinjh0380/trace-forge.git#v0.3.0
 ```
 
 For a step-by-step migration from Unity's `Debug.Log` family, see the

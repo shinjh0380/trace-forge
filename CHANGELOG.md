@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-18
+
 ### Breaking
 - Category verbosity overrides now replace the global minimum for that category in both directions.
 - Unity context overloads can make a `null` second argument ambiguous; use a typed `Exception` or `UnityEngine.Object` cast.
@@ -50,3 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compile-time stripping via `TRACEFORGE_STRIP_TRACE`, `TRACEFORGE_STRIP_DEBUG`, `TRACEFORGE_DISABLE`
 - Editor Settings Provider (Project Settings > TraceForge)
 - Log Viewer EditorWindow
+
+[Unreleased]: https://github.com/shinjh0380/trace-forge/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/shinjh0380/trace-forge/compare/3baeb05071e6291d5abd57e8182b3429f53b8cd2...v0.3.0
