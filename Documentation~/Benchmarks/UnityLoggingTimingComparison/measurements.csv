@@ -1,0 +1,11 @@
+run,block,mode,producerTicks,stopwatchFrequency,producerMs,producerAndFlushMs,allocationRecorderEnabled,profilerEnabled,allocationCallstacksEnabled,persistedMeasuredMessages,persistedWarmupMessages,outputBytes,stdoutBytes,stdoutMeasuredMarkers,stderrBytes,stderrMeasuredMarkers
+1,1,unity,58855019,10000000,5885.5019,,False,False,False,100000,1000,6079173,156,0,0,0
+2,1,traceforge,7196172,10000000,719.6172,761.158,False,False,False,100000,1000,10504003,155,0,0,0
+3,2,traceforge,7777053,10000000,777.7053,810.9009,False,False,False,100000,1000,10504003,155,0,0,0
+4,2,unity,58420061,10000000,5842.0061,,False,False,False,100000,1000,6077517,155,0,0,0
+5,3,unity,58321643,10000000,5832.1643,,False,False,False,100000,1000,6077470,155,0,0,0
+6,3,traceforge,6892912,10000000,689.2912,720.7035,False,False,False,100000,1000,10504003,155,0,0,0
+7,4,traceforge,7972534,10000000,797.2534,830.7661,False,False,False,100000,1000,10504003,156,0,0,0
+8,4,unity,58876515,10000000,5887.6515,,False,False,False,100000,1000,6077476,156,0,0,0
+9,5,unity,59551554,10000000,5955.1554,,False,False,False,100000,1000,6077515,155,0,0,0
+10,5,traceforge,6942134,10000000,694.2134,724.0838,False,False,False,100000,1000,10504003,155,0,0,0

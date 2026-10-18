@@ -1,0 +1,23 @@
+{
+  "Arguments": [
+    "-batchmode",
+    "-nographics",
+    "-quit",
+    "-projectPath",
+    "\"C:\\Projects\\Other\\trace-forge\\.worktrees\\native-logger-test-host\"",
+    "-executeMethod",
+    "ReadmeLoggingComparison.Run",
+    "-logFile",
+    "\"C:\\Projects\\Other\\trace-forge\\.worktrees\\native-logger-test-host\\.readme-logging-comparison-20261018\\run10-traceforge\\unity.log\"",
+    "-tfMode",
+    "traceforge",
+    "-tfOut",
+    "\"C:\\Projects\\Other\\trace-forge\\.worktrees\\native-logger-test-host\\.readme-logging-comparison-20261018\\run10-traceforge\""
+  ],
+  "StartedUtc": "2026-10-18T09:55:18.8644278Z",
+  "CPU": [
+    {
+      "LoadPercentage": 77
+    }
+  ]
+}
