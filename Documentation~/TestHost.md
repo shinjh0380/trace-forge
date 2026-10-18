@@ -2,7 +2,7 @@
 
 ## Normalized configuration (2026-10-18)
 
-The verification host is `C:/Projects/Other/trace-forge/.worktrees/native-logger-test-host`, using Unity **6000.3.8f1** and Test Framework **1.6.0**. Its PlayMode fixture assembly, `Assets/Phase1SampleVerification/TraceForge.HostSample.Tests.asmdef`, references:
+The verification host is `C:/Projects/Other/trace-forge/.worktrees/native-logger-test-host`, validated with Unity **6000.3.8f1** and Test Framework **1.6.0**. Its PlayMode fixture assembly, `Assets/Phase1SampleVerification/TraceForge.HostSample.Tests.asmdef`, references:
 
 ```json
 ["TraceForge.Runtime", "TraceForge.Editor", "TraceForge.HostSample", "UnityEngine.TestRunner"]
@@ -11,6 +11,10 @@ The verification host is `C:/Projects/Other/trace-forge/.worktrees/native-logger
 The unused `UnityEditor.TestRunner` reference was removed as a permanent **host** correction. Package assemblies and test bodies, filters and assertions are unchanged. Keep the normalized host after verification; restoring the earlier asmdef reintroduces the observed missing-runner-script startup failure.
 
 The original host files, asmdef hashes and normalized fixture copy are retained under `.approval-20261018/` inside the host: `Assets.before/`, `Assets.normalized/`, `normalization.json`, `host-before.csv` and `run-tests.original.ps1`. Host files remain ignored and are not shipped in the package. The dated guard validation report describes the earlier temporary workaround; it remains a historical record.
+
+## Editor update attempted (2026-10-18)
+
+After the user installed **6000.6.6f1**, the runner's `$UnityExe` was updated to that path. An isolated full compile failed before tests: nine CS0619 sites in `TF.cs` (`GetInstanceID`) and three UAC0009 sites (`DEVELOPMENT_BUILD`). The previous 6000.3.8f1 results do not establish compatibility with 6000.6.6f1. See the [failed revalidation record](Benchmarks/2026-10-18-unity-6000.6.6f1-revalidation.md); preserve its `.approval-20261018-unity600066/` backups. The host's old `ProjectVersion.txt` was retained after the failed upgrade. Do not treat the runner path or project-version metadata as proof of a successful suite.
 
 ## Recreate the host
 
