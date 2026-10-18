@@ -1,195 +1,74 @@
-# TraceForge
+<p align="center">
+  <strong>English</strong> · <a href="README.ko.md">한국어</a> · <a href="Documentation~/TraceForge.md">API</a> · <a href="Documentation~/Migration.md">Migration</a>
+</p>
 
-A logging package for Unity 6 with no third-party dependencies.
+![TraceForge 0.3.0 — logging for Unity 6](Documentation~/Media/hero.svg)
 
-## Requirements
+Asynchronous files, category filters, and an Editor log viewer. **Unity 6000.0+ · .NET Standard 2.1 · MIT.**
 
-- Minimum Unity version: **6000.0**
-- Validation versions: **6000.3.8f1** (prior validation) and **6000.6.6f1** (current compatibility verification)
-- API Compatibility Level: **.NET Standard 2.1**
+## By the numbers
 
-Context IDs use `ulong` to preserve Unity 6000.6's 64-bit EntityId. Unity 6000.0/6000.3 use an internal conversion that also preserves negative instance IDs. `LogEntry.ContextInstanceId` and its extended constructor changed from `int` to `ulong`; the five-argument constructor is unchanged. IDs identify objects only within the current Unity session and must not be persisted or exchanged between sessions.
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/facts.en.mobile.svg">
+  <img src="Documentation~/Media/facts.en.svg" alt="0 third-party runtime dependencies; 6 verbosity levels; 9 built-in categories; 4,096 default file queue entries.">
+</picture>
 
-The 6000.6.6f1 host passes clean compilation and full EditMode/PlayMode after a test-host path correction. See the [verification record](Documentation~/Benchmarks/2026-10-18-playmode-host-repair-and-performance.md) for scoped performance results and limitations.
+[Sources: package metadata and runtime defaults](Documentation~/Media/README.md#sources).
 
-## Features
+## Measured file output
 
-- **Sink-based** — route logs to an asynchronous file, ring buffer, or your own sink
-- **Asynchronous file output** — formatting and file I/O run on a dedicated background thread
-- **Disabled-path filtering** — verbosity, category, and sink checks happen before TraceForge creates a `LogEntry`; caller-created arguments are evaluated before any method call
-- **Category filtering** — per-category verbosity overrides
-- **Unity log capture** — route engine and third-party messages through the `Unity` category
-- **Context and stacks** — retain Unity context IDs and configurable stack traces without retaining objects
-- **Compile-time stripping** — remove Trace/Debug method bodies while keeping call-site C# evaluation rules explicit
-- **Thread-safe registration** — sink registration uses a copy-on-write array, while each sink documents its own threading model
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/benchmark.en.mobile.svg">
+  <img src="Documentation~/Media/benchmark.en.svg" alt="Direct FileSink benchmark: median producer time for 100,000 prebuilt entries, 5 independent runs per configuration. Reference 22.7981 ms; candidate C2 17.0726 ms, C3 20.1773 ms, C4 16.8669 ms.">
+</picture>
 
-Unity capture and configured stack policies start in Play Mode/Players; the Edit Mode bootstrap currently supplies a ring buffer and filters only.
+Windows Editor **6000.6.6f1** · i7-13700HX · **20/20** runs wrote **100,000 lines each**, with **0 observed GC.Alloc samples** (an event proxy, not a byte-allocation guarantee). Direct `FileSink.Write` only; excludes TF/Logger dispatch and Unity callbacks.
 
-## Installation
+Historical ±10% reproducibility: **FAIL**, with an approved v0.3.0 rig exception. No Player/mobile timing claim. [Raw runs, configuration definitions, and limits](Documentation~/Benchmarks/2026-10-18-playmode-host-repair-and-performance.md).
 
-Add via Unity Package Manager using Git URL:
-```
+## Where logs go
+
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/pipeline.en.mobile.svg">
+  <img src="Documentation~/Media/pipeline.en.svg" alt="TF calls and captured Unity messages pass through category and verbosity filters to sinks. RingBufferSink feeds the Editor viewer; FileSink queues entries for a background writer. A full file queue blocks the producer.">
+</picture>
+
+## Quick start
+
+**1. Install** — Package Manager → **Install package from git URL**:
+
+```text
 https://github.com/shinjh0380/trace-forge.git#v0.3.0
 ```
 
-For a step-by-step migration from Unity's `Debug.Log` family, see the
-[migration guide](Documentation~/Migration.md).
-
-## Quick Start
-
-TraceForge configures its default sinks from **Project Settings > TraceForge**. In the Editor and Development builds, a ring buffer is available automatically, so logging works without initialization code:
+**2. Log** — no initialization code in the Editor or Development builds:
 
 ```csharp
-TF.Info("Game started");
-```
-
-The settings asset is stored at `ProjectSettings/TraceForgeSettings.asset`. Enable the file sink there when a player should write to `Application.persistentDataPath`.
-
-Add a sink in code only when you need an additional destination:
-
-```csharp
-using System.IO;
 using TraceForge;
-using UnityEngine;
 
-// Optional additional sinks
-var fileSink = new FileSink(
-    Path.Combine(Application.persistentDataPath, "traceforge-extra.log"));
-var ringBuffer = new RingBufferSink(capacity: 512);
+TF.Info("Session started");
+TF.Warning(Categories.Network, "Connection interrupted");
 
-TF.AddSink(fileSink);
-TF.AddSink(ringBuffer);
-
-// Log at various verbosity levels
-TF.Info("Game started");
-TF.Warning(Categories.Network, "Connection slow");
-TF.Error("Something went wrong");
-
-// Remove and dispose sinks created by your code during shutdown.
-TF.RemoveSink(fileSink);
-fileSink.Dispose();
+TF.SetCategoryVerbosity(Categories.Network, Verbosity.Debug);
+if (TF.IsEnabled(Verbosity.Debug, Categories.Network))
+    TF.Debug(Categories.Network, $"Frame {UnityEngine.Time.frameCount}");
 ```
 
-## API Reference
+**3. Inspect** — **Window → TraceForge → Log Viewer**.
 
-### TF (Static Facade)
+For files, enable **File Sink** in **Project Settings → TraceForge**. Default output: `Application.persistentDataPath/traceforge.log`. Release Players need an enabled sink. Threaded `FileSink` is unsupported on WebGL.
 
-| Method | Description |
-|--------|-------------|
-| `TF.Info(string)` | Log at Info level (default category) |
-| `TF.Info(LogCategory, string)` | Log at Info level with category |
-| `TF.IsEnabled(Verbosity)` | Check if verbosity would be logged |
-| `TF.IsEnabled(Verbosity, LogCategory)` | Check with category override |
-| `TF.SetMinVerbosity(Verbosity)` | Set global minimum verbosity |
-| `TF.SetCategoryVerbosity(LogCategory, Verbosity)` | Override per category |
-| `TF.AddSink(ILogSink)` | Register a sink |
-| `TF.RemoveSink(ILogSink)` | Unregister a sink |
-| `TF.Reset()` | Reset to default state (useful in tests) |
+Use `IsEnabled` **before** interpolation or expensive arguments. Strip symbols remove method bodies; C# still evaluates call arguments. [Stripping and full API](Documentation~/TraceForge.md).
 
-The same no-context pattern applies to `Trace`, `Debug`, `Warning`, `Error`, and `Fatal`. Context overloads are available only for `Log`, `Warning`, `Error`, and `Fatal`; they record the object's instance ID and must be called from the main thread.
+## Verified configurations
 
-```csharp
-TF.Error("Could not load", gameObject);
-TF.Error("Could not load", exception, gameObject);
-```
+<picture>
+  <source media="(max-width: 640px)" srcset="Documentation~/Media/validation.en.mobile.svg">
+  <img src="Documentation~/Media/validation.en.svg" alt="Release verification: CI on Unity 6000.0.84f1, 6000.3.8f1, and 6000.3.8f1 with Trace/Debug stripped each passed EditMode 28/28 and PlayMode 107/107. Windows 6000.6.6f1 host passed 32/32 and 109/109, including host-only tests. Fresh Git-tag install passed 1/1. No failures or skips.">
+</picture>
 
-If a call with an exception and a context passes `null`, cast it to the intended type because `Error("message", null)` is ambiguous; the one-argument `Error("message")` remains unambiguous.
+[CI results](https://github.com/shinjh0380/trace-forge/actions/runs/39113329138) · [Release evidence](https://github.com/shinjh0380/trace-forge/blob/800fe50095c74448e12ed097842659b4324359e6/Documentation~/Releases/0.3.0.md) · [Visual data sources](Documentation~/Media/README.md)
 
-### Predefined Categories
+---
 
-`Categories.Default`, `Categories.Gameplay`, `Categories.Network`, `Categories.UI`, `Categories.Audio`, `Categories.Physics`, `Categories.AI`, `Categories.Performance`, `Categories.Unity`
-
-### Custom Categories
-
-```csharp
-var myCategory = new LogCategory("MySystem");
-TF.Info(myCategory, "Custom category log");
-```
-
-## Sinks
-
-### RingBufferSink
-In-memory circular buffer. Viewable via **Window > TraceForge > Log Viewer**.
-
-```csharp
-var ringBuffer = new RingBufferSink(capacity: 512);
-TF.AddSink(ringBuffer);
-// ... later ...
-LogEntry[] recent = ringBuffer.GetEntries();
-```
-
-### FileSink
-Writes asynchronously to a file. `Write()` enqueues each entry into a fixed-capacity bounded queue (4,096 entries by default). A dedicated worker thread formats and writes queued entries. When the queue is full, the caller blocks until capacity becomes available instead of dropping the new entry, providing lossless backpressure during normal operation.
-
-`Flush()` waits until every entry accepted before the call has been written and then flushes the underlying writer. `Dispose()` stops accepting entries, drains the queue, joins the worker thread, and closes the file. It does not promise a physical-disk `fsync`.
-
-`FileSink` implements `IDisposable`; the code that creates it owns it and must remove it from `TF` before disposing it during shutdown.
-
-```csharp
-var fileSink = new FileSink(logPath, append: true, queueCapacity: 4096);
-TF.AddSink(fileSink);
-
-// ... logs written ...
-
-TF.RemoveSink(fileSink);
-fileSink.Dispose();
-```
-
-The threaded `FileSink` supports Windows, macOS, Linux, Android, and iOS. It is not supported on WebGL.
-
-### Custom Sinks
-
-```csharp
-public class MySink : ILogSink
-{
-    public void Write(in LogEntry entry)
-    {
-        // entry.Verbosity, entry.Category, entry.Message, entry.Exception, entry.TimestampTicks
-    }
-    public void Flush() { }
-}
-```
-
-## Compile-Time Stripping
-
-Set these as scripting define symbols for the Unity build so they are applied when the package Runtime assembly is compiled:
-
-| Symbol | Effect |
-|--------|--------|
-| `TRACEFORGE_STRIP_TRACE` | Preprocessor removes the `TF.Trace` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Trace)` returns `false`. |
-| `TRACEFORGE_STRIP_DEBUG` | Preprocessor removes the `TF.Debug` method body. Argument evaluation still occurs in the caller; `TF.IsEnabled(Verbosity.Debug)` returns `false`. |
-| `TRACEFORGE_DISABLE` | Preprocessor removes TF logging method bodies and `TF.IsEnabled` returns `false` for every verbosity. Call arguments still follow normal C# evaluation rules. |
-
-For interpolated or otherwise expensive messages, guard the call before constructing the message. The category overload preserves category-specific filtering:
-
-```csharp
-if (TF.IsEnabled(Verbosity.Debug))
-    TF.Debug($"Player {playerId} score {score}");
-
-if (TF.IsEnabled(Verbosity.Trace, Categories.Network))
-    TF.Trace(Categories.Network, BuildPacketSummary());
-```
-
-The guard avoids the work only when its condition is false. It is recommended for disabled verbosity, filtered categories, and configurations with no registered sinks.
-
-Both `IsEnabled` overloads return `false` when no sinks are registered, and the matching overload returns `false` when its Trace or Debug strip symbol is active. Throughput and allocation measurements are reported separately in the [Phase 4 benchmark record](Documentation~/Benchmarks/2026-09-22-native-logger-overhead.md).
-
-## Editor Tools
-
-- **Project Settings > TraceForge** — configure global verbosity
-- **Window > TraceForge > Log Viewer** — view recent logs from RingBufferSink
-- **Window > TraceForge > Reset Logger** — reset to defaults
-
-## Contributing
-
-1. Fork this repository.
-2. Create a feature branch (`git checkout -b feat/my-feature`)
-3. Commit your changes (`git commit -m 'feat: add new feature'`)
-4. Push the branch to your fork (`git push origin feat/my-feature`)
-5. Open a Pull Request.
-
-For bug reports or feature requests, please open an issue in the [Issues](https://github.com/shinjh0380/trace-forge/issues) section.
-
-## License
-
-[MIT License]([LICENSE.md](LICENSE.md)) © 2026 shinjh0380
+[API](Documentation~/TraceForge.md) · [Migration](Documentation~/Migration.md) · [Basic Usage](Samples~/BasicUsage) · [Changelog](CHANGELOG.md) · [Issues](https://github.com/shinjh0380/trace-forge/issues) · [MIT License](LICENSE.md)
