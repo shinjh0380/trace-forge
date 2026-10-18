@@ -179,22 +179,54 @@ namespace TraceForge.Tests
             Assert.AreEqual(1, count);
         }
 
-        [Test]
-        public void ContextOverloads_RecordLiveAndDestroyedInstanceIds()
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        [TestCase(6)]
+        [TestCase(7)]
+        [TestCase(8)]
+        public void ContextOverloads_RecordLiveNullAndDestroyedIds(int overload)
         {
             var context = new GameObject("TraceForgeContext");
             try
             {
-                TF.Error("live", context);
-                int id = context.GetInstanceID();
+                WriteContext(overload, context);
+#if UNITY_6000_6_OR_NEWER
+                ulong id = EntityId.ToULong(context.GetEntityId());
+#else
+                ulong id = unchecked((uint)context.GetInstanceID());
+#endif
                 Assert.AreEqual(id, _sink.Entries[0].ContextInstanceId);
                 UnityEngine.Object.DestroyImmediate(context);
                 Assert.AreEqual(id, _sink.Entries[0].ContextInstanceId);
+                WriteContext(overload, context);
+                WriteContext(overload, null);
+                Assert.AreEqual(0UL, _sink.Entries[1].ContextInstanceId);
+                Assert.AreEqual(0UL, _sink.Entries[2].ContextInstanceId);
             }
             finally
             {
                 if (context != null)
                     UnityEngine.Object.DestroyImmediate(context);
+            }
+        }
+
+        private static void WriteContext(int overload, UnityEngine.Object context)
+        {
+            switch (overload)
+            {
+                case 0: TF.Log(Categories.Default, Verbosity.Info, "context", context); break;
+                case 1: TF.Warning("context", context); break;
+                case 2: TF.Warning(Categories.Default, "context", context); break;
+                case 3: TF.Error("context", context); break;
+                case 4: TF.Error(Categories.Default, "context", context); break;
+                case 5: TF.Error("context", new Exception("context"), context); break;
+                case 6: TF.Fatal("context", context); break;
+                case 7: TF.Fatal(Categories.Default, "context", context); break;
+                case 8: TF.Error(Categories.Default, "context", new Exception("context"), context); break;
             }
         }
 

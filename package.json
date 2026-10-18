@@ -2,7 +2,7 @@
   "name": "com.skrawberries.traceforge",
   "version": "0.2.0",
   "displayName": "TraceForge",
-  "description": "Lightweight sink-based logging for Unity 6 (minimum 6000.0, tested on 6000.3) with category and verbosity filtering.",
+  "description": "Lightweight sink-based logging for Unity 6 (minimum 6000.0, compatible with 6000.6) with category and verbosity filtering.",
   "unity": "6000.0",
   "documentationUrl": "https://github.com/shinjh0380/trace-forge",
   "changelogUrl": "https://github.com/shinjh0380/trace-forge/blob/main/CHANGELOG.md",

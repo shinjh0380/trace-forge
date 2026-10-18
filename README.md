@@ -5,8 +5,12 @@ A logging package for Unity 6 with no third-party dependencies.
 ## Requirements
 
 - Minimum Unity version: **6000.0**
-- Tested on Unity **6000.3**
+- Validation versions: **6000.3.8f1** (prior validation) and **6000.6.6f1** (current compatibility verification)
 - API Compatibility Level: **.NET Standard 2.1**
+
+Context IDs use `ulong` to preserve Unity 6000.6's 64-bit EntityId. Unity 6000.0/6000.3 use an internal conversion that also preserves negative instance IDs. `LogEntry.ContextInstanceId` and its extended constructor changed from `int` to `ulong`; the five-argument constructor is unchanged. IDs identify objects only within the current Unity session and must not be persisted or exchanged between sessions.
+
+The current 6000.6 check passes compilation and EditMode; full PlayMode and performance verification remain [blocked](Documentation~/Benchmarks/2026-10-18-unity66-context-compatibility.md).
 
 ## Features
 

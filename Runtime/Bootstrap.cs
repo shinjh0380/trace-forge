@@ -66,13 +66,11 @@ namespace TraceForge
                 Logger.SetMinVerbosity(Verbosity.Debug);
                 Logger.SetStackTracePolicy(Logger.GetDefaultStackTracePolicy());
                 Logger.ClearAllCategoryVerbosities();
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                if (SinkRegistry.RingBuffers.Length == 0)
+                if (UnityEngine.Debug.isDebugBuild && SinkRegistry.RingBuffers.Length == 0)
                 {
                     if (!AddOwnedSink(new RingBufferSink(1024), configurationVersion))
                         return;
                 }
-#endif
                 StartUnityCapture(configurationVersion, true);
                 return;
             }
@@ -86,13 +84,7 @@ namespace TraceForge
                     Logger.SetCategoryVerbosity(new LogCategory(categoryOverride.Category), categoryOverride.Verbosity);
             }
 
-            bool enableRingBuffer;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            enableRingBuffer = true;
-#else
-            enableRingBuffer = settings.EnableRingBuffer;
-#endif
-            enableRingBuffer = enableRingBuffer || settings.EnableRingBuffer;
+            bool enableRingBuffer = UnityEngine.Debug.isDebugBuild || settings.EnableRingBuffer;
             if (enableRingBuffer && SinkRegistry.RingBuffers.Length == 0)
             {
                 if (!AddOwnedSink(new RingBufferSink(Math.Max(1, settings.RingBufferCapacity)), configurationVersion))

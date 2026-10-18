@@ -43,15 +43,15 @@ namespace TraceForge.Tests.Editor
         public void PingContext_LiveZeroAndDestroyedIds_DoNotThrow()
         {
             var context = new GameObject("TraceForgePingContext");
-            int instanceId = context.GetInstanceID();
+            ulong instanceId = ContextId.Capture(context);
             var method = typeof(TraceForgeLogViewerWindow).GetMethod("PingContext", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.IsNotNull(method);
             try
             {
-                Assert.DoesNotThrow(() => method.Invoke(null, new object[] { instanceId }));
-                Assert.DoesNotThrow(() => method.Invoke(null, new object[] { 0 }));
+                Assert.AreSame(context, method.Invoke(null, new object[] { instanceId }));
+                Assert.IsNull(method.Invoke(null, new object[] { 0UL }));
                 UnityEngine.Object.DestroyImmediate(context);
-                Assert.DoesNotThrow(() => method.Invoke(null, new object[] { instanceId }));
+                Assert.IsNull(method.Invoke(null, new object[] { instanceId }));
             }
             finally
             {

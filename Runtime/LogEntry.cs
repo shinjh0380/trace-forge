@@ -12,8 +12,8 @@ namespace TraceForge
         public string Message { get; }
         public Exception Exception { get; }
         public long TimestampTicks { get; }
-        /// <summary>Unity object instance ID associated with this entry, or zero when absent.</summary>
-        public int ContextInstanceId { get; }
+        /// <summary>Session-local Unity context ID, preserving all 64 bits, or zero when absent.</summary>
+        public ulong ContextInstanceId { get; }
         /// <summary>The captured or externally supplied stack trace, or <see langword="null"/>.</summary>
         public string StackTrace { get; }
 
@@ -42,7 +42,7 @@ namespace TraceForge
             string message,
             Exception exception,
             long timestampTicks,
-            int contextInstanceId,
+            ulong contextInstanceId,
             string stackTrace)
         {
             Verbosity = verbosity;

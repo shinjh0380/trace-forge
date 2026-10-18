@@ -1,5 +1,9 @@
 # TraceForge Documentation
 
+## Unity compatibility
+
+Minimum Unity version remains **6000.0**. The compatibility update targets **6000.6.6f1**; prior validation used **6000.3.8f1**. `LogEntry.ContextInstanceId` and the extended constructor's context argument are now `ulong` (Breaking); the original five-argument constructor remains available. On 6000.6+, `GetEntityId()` and `EntityId.ToULong`/`FromULong` preserve all 64 bits. Earlier versions encode an instance ID's unsigned 32-bit pattern and recover its original signed value for lookup, including negative IDs. The entry retains no Unity object reference, and missing/destroyed context is recorded as zero. An ID already stored in an entry remains unchanged when its object is destroyed. IDs are session-local, not persistent identifiers.
+
 ## Architecture
 
 TraceForge uses a **sink-based** architecture:
@@ -36,6 +40,8 @@ TF.Info(category, message)
 When an override exists, it completely replaces the global minimum for that category in either direction. Clearing the override restores the global minimum.
 
 `StackTracePolicy.ErrorAndAbove` is the default in Editor and Development builds; Release defaults to `None`. `All` is intended for debugging because stack capture allocates. `None` avoids TraceForge stack capture; Unity's own logging may still allocate before its callback.
+
+The default policy is read once at Logger initialization from `Debug.isDebugBuild`; the bootstrap uses that runtime build flag when applying ring-buffer defaults. This preserves the Editor/Development behavior without the deprecated `DEVELOPMENT_BUILD` directive, independently of Unity 6000.6's Managed Code Variant setting. No build-flag query is added to each log write.
 
 ## Thread Safety
 

@@ -189,17 +189,20 @@ namespace TraceForge.Editor
             return -1;
         }
 
-        private static void PingContext(int instanceId)
+        private static UnityEngine.Object PingContext(ulong instanceId)
         {
             if (instanceId == 0)
-                return;
-#if UNITY_6000_3_OR_NEWER
-            var context = EditorUtility.EntityIdToObject((EntityId)instanceId);
+                return null;
+#if UNITY_6000_6_OR_NEWER
+            var context = EditorUtility.EntityIdToObject(EntityId.FromULong(instanceId));
+#elif UNITY_6000_3_OR_NEWER
+            var context = EditorUtility.EntityIdToObject((EntityId)ContextId.ToLegacyInstanceId(instanceId));
 #else
-            var context = EditorUtility.InstanceIDToObject(instanceId);
+            var context = EditorUtility.InstanceIDToObject(ContextId.ToLegacyInstanceId(instanceId));
 #endif
             if (context != null)
                 EditorGUIUtility.PingObject(context);
+            return context;
         }
 
         private void Reacquire()

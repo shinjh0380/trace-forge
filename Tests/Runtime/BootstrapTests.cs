@@ -97,6 +97,20 @@ namespace TraceForge.Tests
         }
 
         [Test]
+        public void ConfiguredSettings_DisablingRingBufferKeepsEditorDefault()
+        {
+            _settings = ScriptableObject.CreateInstance<TraceForgeSettings>();
+            _settings.EnableRingBuffer = false;
+            _settings.RingBufferCapacity = 19;
+            Bootstrap.EditorSettingsLoader = () => _settings;
+
+            Bootstrap.Initialize();
+
+            Assert.AreEqual(1, SinkRegistry.RingBuffers.Length);
+            Assert.AreEqual(19, SinkRegistry.RingBuffers[0].Capacity);
+        }
+
+        [Test]
         public void ConfiguredSettings_AreAppliedBeforeLogging()
         {
             _settings = ScriptableObject.CreateInstance<TraceForgeSettings>();

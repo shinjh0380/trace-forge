@@ -35,7 +35,12 @@ Use `TF.Info`, `TF.Warning`, `TF.Error`, and `TF.Fatal` for the corresponding
 application messages. Use `TF.Log(category, verbosity, message)` when the
 verbosity or category is selected dynamically. Context overloads are available
 on `Log`, `Warning`, `Error`, and `Fatal`; they store the Unity object's
-instance ID without retaining the object. `TF.Error(message, exception)` stores
+session-local context ID without retaining the object. `LogEntry.ContextInstanceId`
+and the extended constructor's context argument are now `ulong`, preserving all
+64 bits on Unity 6000.6; the original five-argument constructor is unchanged.
+Use `ulong` when reading the ID. Zero means no context; do not persist IDs across
+Unity sessions. Older Unity versions preserve signed instance IDs internally.
+`TF.Error(message, exception)` stores
 the exception, and the file sink writes its `ToString()` representation.
 
 | Debug.Log call | TF equivalent | Notes |

@@ -21,11 +21,9 @@ namespace TraceForge
         // int backing field for Interlocked operations on enum
         private static int _globalMinVerbosityInt = (int)Verbosity.Debug;
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        private const StackTracePolicy DefaultStackTracePolicy = StackTracePolicy.ErrorAndAbove;
-#else
-        private const StackTracePolicy DefaultStackTracePolicy = StackTracePolicy.None;
-#endif
+        private static readonly StackTracePolicy DefaultStackTracePolicy = UnityEngine.Debug.isDebugBuild
+            ? StackTracePolicy.ErrorAndAbove
+            : StackTracePolicy.None;
         private static int _stackTracePolicyInt = (int)DefaultStackTracePolicy;
 
         // Copy-on-write dictionary; reference itself is volatile for lock-free reads
@@ -101,7 +99,7 @@ namespace TraceForge
         }
 
         [HideInCallstack]
-        internal static void Write(Verbosity verbosity, in LogCategory category, string message, Exception exception, int contextInstanceId)
+        internal static void Write(Verbosity verbosity, in LogCategory category, string message, Exception exception, ulong contextInstanceId)
         {
             if (!IsEnabled(verbosity, category))
                 return;
