@@ -51,6 +51,8 @@ Recommended: option 2 for the default test run plus the CI-generated response-fi
 
 ## Benchmark Protocol (same as 2026-07-22)
 
+Current verification follow-up (2026-10-18): [host repair and complete same-rig comparison](../../Benchmarks/2026-10-18-playmode-host-repair-and-performance.md) records Unity6000.6.6f1/UTF1.8.0, default reload, Edit32/Play107, fresh compile diagnostics0 and C1–C4×5 complete runs. C2/C3/C4 direct producer deltas are −25.1139%/−11.4957%/−26.0162%, paired t95% upper ratios0.845591/0.969530/0.844803, GCproxy0 and100,000 persisted lines per run. Independent Astra review accepts **this Windows Editor direct-FileSink comparison only**. Preserve the earlier incomplete/failed records, ±10% historical FAIL and approved policy scope below. CPU snapshot20–100%, n=5 and initial explicit AC telemetry gap preclude a general stable-rig claim. No new baseline, TF/Logger cost guarantee, Player/mobile claim or release approval follows from this PASS.
+
 ### Approved gate application for v0.3.0 (2026-10-18)
 
 For the designated Windows Editor rig (Unity 6000.3.8f1/UTF 1.6.0, Windows 11 build 26200/i7-13700HX), the user approved replacing mandatory historical ±10% reproduction with a same-environment comparison of `f95dcc2` and the identified current candidate. Historical FAIL reports below and in the benchmark archive remain unchanged. The direct FileSink producer ≤5% regression limit, allocation sample proxy 0 and actual 100,000-line validation remain mandatory; completion has no producer-style 5% gate. If environmental variation prevents a defensible 5% comparison, report insufficient evidence and preserve all results rather than rerun for favorable numbers.
